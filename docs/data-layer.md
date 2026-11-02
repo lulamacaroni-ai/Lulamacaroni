@@ -350,6 +350,76 @@ One row per: Una regla o dato aprobado (voz, paleta, políticas, FAQ). Key: `con
 | `aprobado_en` |  |
 | `vigente` | si, no |
 
+### Investigacion
+
+One row per: Una fila de un export de eRank o EverBee: una keyword o un producto de la competencia. Key: `investigacion_id`.
+
+| Column | Allowed values |
+|---|---|
+| `investigacion_id` |  |
+| `importacion_id` |  |
+| `linea` | US-POD, MX-original |
+| `fuente` | erank, everbee |
+| `tipo` | keyword, producto |
+| `fecha_export` |  |
+| `mercado` |  |
+| `categoria` | print, enmarcado, descargable, cojin, wallpaper, otro |
+| `keyword` |  |
+| `busquedas` |  |
+| `clics` |  |
+| `ctr` |  |
+| `competencia` |  |
+| `tendencia` |  |
+| `titulo` |  |
+| `tienda` |  |
+| `precio` |  |
+| `moneda` |  |
+| `ventas_mes` |  |
+| `ingresos_mes` |  |
+| `resenas` |  |
+| `favoritos` |  |
+| `etiquetas` |  |
+
+### Importaciones
+
+One row per: Un archivo CSV de eRank o EverBee importado (o que no se pudo importar). Key: `importacion_id`.
+
+| Column | Allowed values |
+|---|---|
+| `importacion_id` |  |
+| `fuente` | erank, everbee |
+| `tipo` | keyword, producto |
+| `archivo` |  |
+| `archivo_id` |  |
+| `fecha_export` |  |
+| `fecha_export_origen` | nombre-archivo, archivo, dia-importacion |
+| `importado_en` |  |
+| `filas` |  |
+| `filas_omitidas` |  |
+| `columnas_usadas` |  |
+| `columnas_ignoradas` |  |
+| `estado` | ok, parcial, error |
+| `nota` |  |
+
+### Keywords
+
+One row per: Una keyword que Lorena quiere probar en una obra, y cómo le fue. Key: `keyword_id`.
+
+| Column | Allowed values |
+|---|---|
+| `keyword_id` |  |
+| `obra_id` |  |
+| `linea` | US-POD, MX-original |
+| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `keyword` |  |
+| `categoria` | print, enmarcado, descargable, cojin, wallpaper, otro |
+| `estado` | a-probar, probando, en-uso, descartada |
+| `desde` |  |
+| `hasta` |  |
+| `resultado` |  |
+| `nota` |  |
+| `actualizado` |  |
+
 ### Fuentes
 
 One row per: Una fuente de datos y su última actualización. Key: `fuente`.

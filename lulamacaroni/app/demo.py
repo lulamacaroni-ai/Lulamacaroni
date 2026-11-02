@@ -189,9 +189,48 @@ def seed_publicidad(book, store, now: datetime | None = None) -> None:
     solicitar(book, store, "pub-2", creado_por="Ejemplo", now=now)
 
 
+def seed_investigacion(book, now: datetime | None = None) -> None:
+    """Demo research: three monthly eRank keyword exports and one EverBee product export,
+    run through the real importer. Sample words only; never written to the live sheet."""
+    from ..connectors.investigacion import importar
+
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    book.upsert("Obras", [
+        {"obra_id": "DEMO-001", "tema": "garden flowers", "colores": "green, pink"},
+        {"obra_id": "DEMO-002", "tema": "harbor boats", "colores": "blue"}])
+    mes = now.date().replace(day=1)
+    previo = (mes - timedelta(days=1)).replace(day=1)
+    fechas = [(previo - timedelta(days=1)).replace(day=1), previo, mes]
+    # keyword, searches over three months, competition
+    kws = (("garden wall art", (900, 1100, 1400), 21000),
+           ("botanical print", (2400, 2300, 2500), 98000),
+           ("harbor painting", (300, 280, 900), 6400),
+           ("framed boat print", (500, 450, 400), 12000),
+           ("garden printable", (1500, 1600, 1550), 54000),
+           ("pink flower pillow", (200, 210, 230), 3100))
+    for i, f in enumerate(fechas):
+        lines = ["Keyword,Avg. Searches,Avg. Clicks,Avg. CTR,Etsy Competition,Google Searches"]
+        lines += [f'{k},"{v[i]:,}",{v[i] // 3},{33 + i}%,"{c:,}",120' for k, v, c in kws]
+        importar(book, f"erank-keywords-ejemplo-{f.isoformat()}.csv",
+                 ("\n".join(lines)).encode(), now=now - timedelta(days=(2 - i) * 30))
+    prods = ["Product Name,Shop Name,Price,Mo. Sales,Mo. Revenue,Reviews,Favorites",
+             "Sample Garden Art Print 8x10,Tienda Ejemplo A,$18.00,40,$720,210,900",
+             "Sample Botanical Poster,Tienda Ejemplo B,$24.50,22,$539,95,400",
+             "Sample Framed Harbor Print,Tienda Ejemplo C,$68.00,9,$612,30,150",
+             "Sample Framed Flower Art,Tienda Ejemplo D,$95.00,4,$380,12,80",
+             "Sample Garden Printable Download,Tienda Ejemplo E,$4.99,150,$748,1200,3000"]
+    importar(book, f"everbee-productos-ejemplo-{mes.isoformat()}.csv",
+             ("\n".join(prods)).encode(), now=now)
+    book.upsert("Keywords", [
+        {"keyword_id": "kw-demo-1", "obra_id": "DEMO-001", "linea": "US-POD",
+         "canal": "shopify", "keyword": "garden wall art", "categoria": "print",
+         "estado": "probando", "desde": fechas[1].isoformat(), "nota": "ejemplo"}])
+
+
 def fill_demo(book, now: datetime | None = None) -> None:
     from ..margen import recalcular
 
     for tab_name, rows in demo_rows(now).items():
         book.upsert(tab_name, rows)
     recalcular(book)
+    seed_investigacion(book, now)

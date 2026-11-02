@@ -30,7 +30,8 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
 
 NAV = (("/", "Inicio"), ("/alertas", "Alertas"), ("/aprobar", "Aprobar"),
        ("/catalogo", "Catálogo"), ("/contenido", "Contenido"), ("/publicidad", "Anuncios"),
-       ("/pedidos", "Pedidos"), ("/clientes", "Clientes"), ("/fuentes", "Fuentes"))
+       ("/pedidos", "Pedidos"), ("/clientes", "Clientes"), ("/investigacion", "Investigación"),
+       ("/fuentes", "Fuentes"))
 
 CSS = """
 :root{--bg:#FBF8F3;--card:#FFFFFF;--ink:#1C1C1E;--muted:#4A4A50;--line:#E0D6C8;
