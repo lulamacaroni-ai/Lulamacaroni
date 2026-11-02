@@ -80,6 +80,17 @@ ESTADOS_SEGUIMIENTO = ("pendiente", "hecho", "cancelado")
 
 ORIENTACIONES = ("vertical", "horizontal", "cuadrada")
 
+# Market research (Lorena's requirements, sections 7 and 8): monthly CSV exports from eRank
+# and EverBee. Every number in them is the tool's own estimate on the day of the export;
+# none is a promise of sales.
+FUENTES_INVESTIGACION = ("erank", "everbee")
+TIPOS_INVESTIGACION = ("keyword", "producto")
+# kept apart because buyers search for each one differently
+CATEGORIAS_PRODUCTO = ("print", "enmarcado", "descargable", "cojin", "wallpaper", "otro")
+ESTADOS_IMPORTACION = ("ok", "parcial", "error")
+ORIGEN_FECHA_EXPORT = ("nombre-archivo", "archivo", "dia-importacion")
+ESTADOS_KEYWORD = ("a-probar", "probando", "en-uso", "descartada")
+
 
 @dataclass(frozen=True)
 class Tab:
@@ -312,6 +323,46 @@ TABS: tuple[Tab, ...] = (
             "tema": ("voz", "paleta", "producto", "politica", "faq", "rubrica"),
             "idioma": ("en", "es"), "vigente": ("si", "no"),
         },
+    ),
+    Tab(
+        nombre="Investigacion",
+        fila="Una fila de un export de eRank o EverBee: una keyword o un producto de la competencia",
+        clave="investigacion_id",
+        columnas=(
+            "investigacion_id", "importacion_id", "linea", "fuente", "tipo", "fecha_export",
+            "mercado", "categoria",
+            # keyword rows (eRank keyword tool, EverBee keyword research)
+            "keyword", "busquedas", "clics", "ctr", "competencia", "tendencia",
+            # product rows (EverBee product analytics): public price, the tool's estimates
+            "titulo", "tienda", "precio", "moneda", "ventas_mes", "ingresos_mes",
+            "resenas", "favoritos", "etiquetas",
+        ),
+        validaciones={"linea": LINEAS, "fuente": FUENTES_INVESTIGACION,
+                      "tipo": TIPOS_INVESTIGACION, "categoria": CATEGORIAS_PRODUCTO},
+    ),
+    Tab(
+        nombre="Importaciones",
+        fila="Un archivo CSV de eRank o EverBee importado (o que no se pudo importar)",
+        clave="importacion_id",
+        columnas=(
+            "importacion_id", "fuente", "tipo", "archivo", "archivo_id", "fecha_export",
+            "fecha_export_origen", "importado_en", "filas", "filas_omitidas",
+            "columnas_usadas", "columnas_ignoradas", "estado", "nota",
+        ),
+        validaciones={"fuente": FUENTES_INVESTIGACION, "tipo": TIPOS_INVESTIGACION,
+                      "fecha_export_origen": ORIGEN_FECHA_EXPORT,
+                      "estado": ESTADOS_IMPORTACION},
+    ),
+    Tab(
+        nombre="Keywords",
+        fila="Una keyword que Lorena quiere probar en una obra, y cómo le fue",
+        clave="keyword_id",
+        columnas=(
+            "keyword_id", "obra_id", "linea", "canal", "keyword", "categoria", "estado",
+            "desde", "hasta", "resultado", "nota", "actualizado",
+        ),
+        validaciones={"linea": LINEAS, "canal": CANALES, "categoria": CATEGORIAS_PRODUCTO,
+                      "estado": ESTADOS_KEYWORD},
     ),
     Tab(
         nombre="Fuentes",

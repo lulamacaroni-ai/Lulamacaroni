@@ -34,7 +34,7 @@ FUENTE_CONTABLE = "quickbooks"
 class Alerta:
     nivel: str
     area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido
-                         # | publicidad | clientes
+                         # | publicidad | clientes | investigacion
     titulo: str
     detalle: str
     fuente: str
@@ -238,6 +238,22 @@ def clientes(cs, fuentes: dict[str, m.EstadoFuente], now: datetime) -> list[Aler
     return out
 
 
+def investigacion(inv, now: datetime) -> list[Alerta]:
+    """Monthly research export overdue; keywords rising three months in a row."""
+    if inv is None:
+        return []
+    from .investigacion import avisos
+
+    out = []
+    for nivel, titulo, detalle, act in avisos(inv, now):
+        out.append(Alerta(
+            ATENCION if nivel == "atencion" else INFO, "investigacion", titulo, detalle,
+            "Libro de datos (Importaciones + Investigacion)", act, "/investigacion",
+            "Exporta el CSV del mes y déjalo en la carpeta de Drive" if nivel == "atencion"
+            else "", 30))
+    return out
+
+
 def acciones(alertas: list[Alerta], n: int = 3) -> list[Alerta]:
     """The day's priority actions: the first ``n`` alerts that ask for something."""
     return [a for a in alertas if a.accion and a.nivel != INFO][:n]
@@ -320,6 +336,7 @@ def resumen_dia(d, now: datetime | None = None) -> ResumenDia:
                                   d.fuentes, now)
     lista += publicidad(getattr(d, "campanas_plan", []), now)
     lista += clientes(getattr(d, "clientes", []), d.fuentes, now)
+    lista += investigacion(getattr(d, "investigacion", None), now)
     lista.sort(key=lambda a: (NIVELES.index(a.nivel), a.prioridad))
     ranuras = [ventas_canal(d.pedidos_rows, d.fuentes, f, c, per) for f, c in CANALES_VENTA]
     ranuras.append(gastos_mes(d.gastos, d.fuentes, now))

@@ -11,6 +11,8 @@ from . import alertas as al
 from . import catalogo as cat
 from . import clientes as cli
 from . import contenido as cont
+from . import investigacion as inv
+from .investigacion_view import investigacion_view
 from . import metrics as m
 from . import publicidad as pub
 from . import views
@@ -45,6 +47,13 @@ class Datos:
         self.clientes_rows = book.read("Clientes")
         self.clientes = cli.clientes(self.clientes_rows, self.pedidos_rows, self.fuentes,
                                      self.now)
+        faltan = len(self.faltan_tabs)
+        self.investigacion_rows = self._opcional(book, "Investigacion")
+        self.importaciones = self._opcional(book, "Importaciones")
+        self.keywords = self._opcional(book, "Keywords")
+        self.investigacion = inv.investigacion(self.investigacion_rows, self.importaciones,
+                                               self.keywords, self.obras,
+                                               self.faltan_tabs[faltan:])
         self.campanas_plan = pub.campanas(self.publicidad, self.obras, self.approvals,
                                           self.topes, self.pedidos_rows, self.campanas,
                                           self.fuentes, self.now)
@@ -112,6 +121,12 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
             cli.filtrar(d.clientes, filtro),
             cli.resumen(d.clientes, d.pedidos_rows, d.fuentes, per, d.now),
             cli.origenes(d.clientes), filtro, per, d.fuentes, d.now, banner)
+    if path == "/investigacion":
+        categoria = params.get("c", "")
+        categoria = categoria if categoria in inv.CATEGORIA else ""
+        return investigacion_view(d.investigacion, inv.resumen(d.investigacion,
+                                                                     d.fuentes, d.now),
+                                        categoria, d.fuentes, d.now, banner)
     if path == "/fuentes":
         return views.fuentes_view(d.fuentes, d.now, banner)
     if path == "/aprobar":
