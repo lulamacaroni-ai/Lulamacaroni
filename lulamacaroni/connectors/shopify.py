@@ -459,7 +459,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from ..localbook import open_workbook
 
-    wb = open_workbook()  # the Google Sheet if LULA_WORKBOOK_ID is set, else data/libro/
+    wb = open_workbook()  # the Google Sheet when a key is configured, else data/libro/
     wb.upsert("Listados", listings)
     wb.upsert("Pedidos", orders)
     wb.stamp_source("shopify", rows=len(listings) + len(orders),

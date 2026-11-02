@@ -40,8 +40,8 @@ The fingerprint is the core safeguard. Lorena sees the exact content under "Ver 
 
 ## Where records live
 
-- **Now:** a local JSON file (`LULA_APPROVALS_PATH`, git-ignored).
-- **When the workbook is live:** the `Aprobaciones` tab, through a `SheetsStore` with the same methods (`add`, `get`, `update`, `all`). The workbook then becomes the audit trail. Every published item has an approval record, which is one of the Build Plan's success measures.
+- **Without a Google key** (tests, a laptop): a local JSON file (`LULA_APPROVALS_PATH`, git-ignored).
+- **With the Google key configured:** the `Aprobaciones` tab, through `SheetsStore` with the same methods (`add`, `get`, `update`, `all`). The workbook then becomes the audit trail. Every published item has an approval record, which is one of the Build Plan's success measures.
 
 ## Hosting so she can approve from her phone
 
@@ -49,7 +49,7 @@ The local server binds to `127.0.0.1` and checks that form posts come from the s
 
 ## Not built yet
 
-- `SheetsStore` (needs the workbook, M7)
+- ~~`SheetsStore`~~ done (`lulamacaroni/approval/store.py`)
 - Notifications (daily digest of pending approvals)
 - Spending caps per platform and per day (her requirement 4). The `presupuesto` type already requires an amount, so caps can be enforced at request time.
 - Agreed auto-rules (later, only with her explicit OK)

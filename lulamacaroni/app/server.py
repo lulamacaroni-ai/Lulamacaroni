@@ -3,7 +3,7 @@
     python -m lulamacaroni.app.server            # http://127.0.0.1:8770, real data
     python -m lulamacaroni.app.server --demo     # sample data, clearly marked, nothing real
 
-Real data comes from the workbook: the Google Sheet when ``LULA_WORKBOOK_ID`` is set,
+Real data comes from the workbook: the Google Sheet when a Google key is configured,
 otherwise the local files that ``python -m lulamacaroni.connectors.shopify`` writes to
 ``data/libro/``. Approvals come from the approval store.
 
@@ -22,8 +22,9 @@ from urllib.parse import parse_qs, urlparse
 
 from .. import config
 from ..approval.gate import decide
-from ..approval.store import JsonStore, open_store
+from ..approval.store import JsonStore, SheetsStore, open_store
 from ..localbook import LocalWorkbook, open_workbook
+from ..workbook import Workbook
 from .screens import Datos, render
 
 APPROVER = config.get("LULA_APPROVER", "Lorena")
@@ -105,7 +106,9 @@ def main(argv: list[str] | None = None) -> int:
         Handler.banner = "Datos de ejemplo: nada de esto es real."
     else:
         Handler.book = open_workbook()
-        Handler.store = open_store()
+        # one connection and one cache for both: an approval shows up on the next screen
+        Handler.store = (SheetsStore(Handler.book) if isinstance(Handler.book, Workbook)
+                         else open_store())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Back office en http://127.0.0.1:{args.port}  (Ctrl+C para salir)")
     try:

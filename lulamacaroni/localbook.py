@@ -1,7 +1,7 @@
 """A local stand-in for the workbook: one JSON file per tab, same rules as the sheet.
 
-Until the "LulaMacaroni Operaciones" Google Sheet and its service account exist, the
-connectors and the app read and write here (``LULA_LOCAL_DATA``, default
+When no Google key is configured (tests, a laptop without the key, ``LULA_LIBRO=local``),
+the connectors and the app read and write here (``LULA_LOCAL_DATA``, default
 ``data/libro``, git-ignored). Same validation, same upsert-by-key, same ``Fuentes``
 stamp, so switching to the sheet later is a setting, not a rewrite.
 
@@ -74,9 +74,25 @@ def local_folder() -> Path:
     return p if p.is_absolute() else config.REPO_ROOT / p
 
 
+def backend() -> str:
+    """``google`` or ``local``.
+
+    ``LULA_LIBRO`` forces one (``google`` / ``local``). Otherwise Google is used as soon
+    as a service account key or ``LULA_WORKBOOK_ID`` is configured. There is no silent
+    fallback: if Google is configured but unreachable, the caller gets the error instead
+    of old local data that looks current.
+    """
+    forced = (config.get("LULA_LIBRO") or "").strip().lower()
+    if forced in ("google", "local"):
+        return forced
+    from .workbook import has_credentials
+
+    return "google" if (has_credentials() or config.get("LULA_WORKBOOK_ID")) else "local"
+
+
 def open_workbook():
-    """The Google Sheet when ``LULA_WORKBOOK_ID`` is set, otherwise the local JSON files."""
-    if config.get("LULA_WORKBOOK_ID"):
+    """The Google Sheet when configured (see :func:`backend`), otherwise the local JSON files."""
+    if backend() == "google":
         from .workbook import Workbook
 
         return Workbook.from_env()

@@ -27,6 +27,9 @@ Es una hoja de Google en la cuenta del negocio. Puedes leerla y corregirla tú m
 - **Variantes**: cada producto que se vende (tamaño, papel, marco, precio), marcado como EUA o México.
 - **Pedidos** y **Pagos** van por separado: la venta y el depósito no se cuentan dos veces.
 - **Fuentes**: cuándo se actualizó cada dato. Si un número dice `faltante`, no es cero: es que no llegó.
+- **Aprobaciones**: cada cosa que aprobaste o rechazaste, con fecha. Es el historial; no borres filas.
+
+Puedes escribir notas en las filas. Lo único que no debes cambiar es el nombre de las pestañas ni la primera fila (los encabezados): el sistema se guía por ellos. Si algo se mueve por error, se arregla con `python -m lulamacaroni.setup_workbook`, que nunca borra nada. La aplicación tarda hasta 30 segundos en mostrar un cambio que hiciste a mano en la hoja.
 
 ## Cuando una revisión falla
 

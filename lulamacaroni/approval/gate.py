@@ -12,8 +12,9 @@ How it works
    Any edit after approval changes the fingerprint and needs a new approval.
 4. After acting, :func:`mark_executed` stamps the record so it can never be used twice.
 
-Records live in the ``Aprobaciones`` tab once the workbook is live; until then a local
-JSON file (``LULA_APPROVALS_PATH``) holds them through the same store interface.
+Records live in the ``Aprobaciones`` tab of the Google Sheet when a Google key is
+configured; otherwise a local JSON file (``LULA_APPROVALS_PATH``) holds them through the
+same store interface.
 """
 
 from __future__ import annotations
