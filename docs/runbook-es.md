@@ -57,7 +57,7 @@ Y cada número tiene una de estas calidades:
 
 ## 4. Las vistas, una por una
 
-La barra de abajo tiene: Inicio, Alertas, Aprobar, Catálogo, Contenido, Anuncios (Publicidad), Pedidos, Clientes y Fuentes.
+La barra de abajo tiene: Inicio, Alertas, Aprobar, Catálogo, Contenido, Anuncios (Publicidad), Pedidos, Clientes, Investigación y Fuentes.
 
 ### Inicio · Resumen del día
 
@@ -153,9 +153,17 @@ Todavía no es una vista aparte. Mientras tanto:
 - En **Pedidos** ves el margen de cada pedido.
 - Gastos, utilidad y conciliación dicen “fuente no conectada” hasta que se conecte QuickBooks.
 
-### Investigación (en construcción)
+### Investigación
 
-Aquí van a aparecer los datos de eRank y EverBee (palabras de búsqueda, tendencias, competencia). Cada mes exportas un archivo CSV de cada herramienta y lo dejas en la carpeta de Drive del negocio; el sistema lo importa. Esta guía se completa cuando la vista esté lista.
+Lo que dicen eRank y EverBee: keywords con sus búsquedas y competencia, tendencias, precios de la competencia y keywords sugeridas para tus obras. Cada número dice de qué archivo y de qué fecha salió. Si no has subido nada, muestra “—”.
+
+No están conectados por API. Una vez al mes:
+
+1. Exporta un CSV de eRank y otro de EverBee. Ponles un nombre con la herramienta y la fecha, por ejemplo `erank-keywords-2026-11-01.csv`.
+2. Arrástralos a la carpeta de Drive **LulaMacaroni Investigación** (cuenta del negocio). No borres los de meses anteriores: con tres meses el sistema ya distingue una keyword que sube de forma sostenida de un pico.
+3. Pídele a Claude *“importa la investigación”*. Un archivo que ya se importó no se vuelve a leer.
+
+La guía paso a paso, con las columnas que reconoce, está en [setup/investigacion-es.md](setup/investigacion-es.md).
 
 ### Fuentes
 
@@ -178,7 +186,7 @@ Una tabla con cada fuente de datos (Shopify, Prodigi, tu hoja, Etsy, contabilida
 
 **Cada semana:** revisa Catálogo → Con avisos, y Clientes → Seguimientos.
 
-**Cada mes:** exporta los CSV de eRank y EverBee a Drive, revisa tus Topes de publicidad y comparte con tu contador lo que te pida.
+**Cada mes:** exporta los CSV de eRank y EverBee a la carpeta LulaMacaroni Investigación, revisa tus Topes de publicidad y comparte con tu contador lo que te pida.
 
 ## 6. “Fuente no conectada”
 
