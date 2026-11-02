@@ -33,7 +33,7 @@ FUENTE_CONTABLE = "quickbooks"
 @dataclass
 class Alerta:
     nivel: str
-    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas
+    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido
     titulo: str
     detalle: str
     fuente: str
@@ -178,6 +178,34 @@ def calcular(pedidos_rows: list[dict], pedidos: list[m.Pedido], productos: list[
     return out
 
 
+def catalogo_y_contenido(fichas, piezas, fuentes: dict[str, m.EstadoFuente],
+                         now: datetime) -> list[Alerta]:
+    """Print files that can't print a live size, and content whose approval is not valid."""
+    from .catalogo import avisos_archivo
+    from .contenido import alertas as contenido_alertas
+
+    out = []
+    malos = avisos_archivo(fichas)
+    if malos:
+        n = sum(k for _, k in malos)
+        out.append(Alerta(
+            URGENTE, "tienda", f"{n} variante(s) en venta con archivo que no sirve para su tamaño",
+            "Proporción distinta o resolución por debajo del mínimo. No se recorta ni se estira: "
+            f"hace falta un archivo para ese tamaño o quitar el tamaño: {_lista([t for t, _ in malos])}.",
+            "Libro de datos (Variantes) + Shopify", _act(fuentes, "shopify"), "/catalogo?f=avisos",
+            "Revisa los archivos de impresión que no sirven para su tamaño", 7,
+            [t for t, _ in malos]))
+    for p in contenido_alertas(piezas, now):
+        cuando = m.dia(p.fecha) if p.fecha else "sin fecha"
+        out.append(Alerta(
+            URGENTE if p.estado in ("aprobado", "programado") else ATENCION, "contenido",
+            f"{p.titulo} ({p.plataforma.capitalize() or 'contenido'}, {cuando})",
+            p.gate.texto + ". Nada se publica sin tu aprobación del texto e imagen exactos.",
+            "Libro de datos (Contenido + Aprobaciones)", now, "/contenido",
+            f"Revisa la aprobación de “{p.titulo}”", 9))
+    return out
+
+
 def acciones(alertas: list[Alerta], n: int = 3) -> list[Alerta]:
     """The day's priority actions: the first ``n`` alerts that ask for something."""
     return [a for a in alertas if a.accion and a.nivel != INFO][:n]
@@ -256,6 +284,9 @@ def resumen_dia(d, now: datetime | None = None) -> ResumenDia:
     hoy = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, per, d.pagos)
     lista = calcular(d.pedidos_rows, d.pedidos, d.productos, d.fuentes, d.excepciones,
                      d.pendientes, d.fuentes_rows)
+    lista += catalogo_y_contenido(getattr(d, "fichas", []), getattr(d, "piezas", []),
+                                  d.fuentes, now)
+    lista.sort(key=lambda a: (NIVELES.index(a.nivel), a.prioridad))
     ranuras = [ventas_canal(d.pedidos_rows, d.fuentes, f, c, per) for f, c in CANALES_VENTA]
     ranuras.append(gastos_mes(d.gastos, d.fuentes, now))
     return ResumenDia(hoy, lista, acciones(lista), ranuras)

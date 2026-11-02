@@ -60,7 +60,39 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
          "comisiones": 2.62, "retenciones": 0, "reembolsos": 0, "conciliado": "no",
          "estado": "en-transito"},
     ]
-    return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos}
+    obras = [
+        {"obra_id": "DEMO-001", "titulo": "Sample Garden", "titulo_es": "Jardín de ejemplo",
+         "coleccion": "Ejemplo", "orientacion": "vertical", "estado": "activa",
+         "version_aprobada": "v1"},
+        {"obra_id": "DEMO-002", "titulo": "Sample Harbor", "titulo_es": "Puerto de ejemplo",
+         "tecnica": "acrílico sobre tela", "ancho_cm": 60, "alto_cm": 80,
+         "orientacion": "vertical", "estado": "activa"},
+    ]
+    variantes = [  # Sample Garden: 3:4 file, so 8x10 (4:5) can't print without a new file
+        {"sku": f"DEMO-1-{size}", "obra_id": "DEMO-001", "linea": "US-POD", "tipo": "impresion",
+         "tamano": size, "pod_proveedor": "prodigi", "archivo_impresion": "demo-garden-v1.tif",
+         "archivo_px": "5400x7200", "costo_usd": cost, "estado": "activa"}
+        for size, cost in (("8x10", 24.0), ("12x16", 31.0), ("18x24", 44.0))
+    ] + [
+        {"sku": "DEMO-2-ORIG", "obra_id": "DEMO-002", "linea": "MX-original", "tipo": "original",
+         "precio_mxn_con_iva": 14500, "estado": "activa"},
+    ]
+    contenido = [
+        {"contenido_id": "c-1", "linea": "US-POD", "obra_id": "DEMO-001",
+         "plataforma": "instagram", "formato": "reel", "idioma": "en", "estado": "programado",
+         "programado_para": _iso(now + timedelta(days=1)), "titulo": "Garden reveal reel",
+         "texto": "Sample caption for a slow pan over the original. Link in bio.",
+         "archivo": "demo-garden-v1.tif"},
+        {"contenido_id": "c-2", "linea": "US-POD", "obra_id": "DEMO-001",
+         "plataforma": "pinterest", "formato": "pin", "idioma": "en", "estado": "borrador",
+         "programado_para": _iso(now + timedelta(days=4)), "titulo": "Garden print pin",
+         "texto": "Sample pin description.", "archivo": "demo-garden-v1.tif"},
+        {"contenido_id": "c-3", "linea": "MX-original", "obra_id": "DEMO-002",
+         "plataforma": "instagram", "formato": "carrusel", "idioma": "es", "estado": "idea",
+         "titulo": "Proceso de la obra (idea)"},
+    ]
+    return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos,
+            "Obras": obras, "Variantes": variantes, "Contenido": contenido}
 
 
 def fill_demo(book, now: datetime | None = None) -> None:

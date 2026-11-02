@@ -29,7 +29,8 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
                  "sin-conectar": "sin conectar"}
 
 NAV = (("/", "Inicio"), ("/alertas", "Alertas"), ("/aprobar", "Aprobar"),
-       ("/catalogo", "Catálogo"), ("/pedidos", "Pedidos"), ("/fuentes", "Fuentes"))
+       ("/catalogo", "Catálogo"), ("/contenido", "Contenido"), ("/pedidos", "Pedidos"),
+       ("/fuentes", "Fuentes"))
 
 CSS = """
 :root{--bg:#FBF8F3;--card:#FFFFFF;--ink:#1C1C1E;--muted:#4A4A50;--line:#E0D6C8;
@@ -93,7 +94,7 @@ td{padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
 .tablebox{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 .empty{color:var(--muted);text-align:center;padding:20px}
 nav.bottom{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
-display:grid;grid-template-columns:repeat(6,1fr);text-align:center;font-size:.74rem;z-index:5}
+display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.7rem;z-index:5}
 nav.bottom a{padding:14px 2px;color:var(--muted);min-height:48px}
 nav.bottom a.on{color:var(--ink);font-weight:700}
 .tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:6px;font-size:.8rem}
@@ -318,6 +319,14 @@ def pedidos(lista: list[Pedido], fuentes: dict[str, EstadoFuente], now: datetime
 
 # --- Catálogo ---------------------------------------------------------------------------------
 
+ARCHIVO = {"ideal": ("ok", "archivo ideal"), "aceptable": ("ok", "archivo aceptable"),
+           "baja-resolucion": ("warn", "resolución baja"), "no-apto": ("warn", "no sirve"),
+           "sin-revisar": ("gray", "sin revisar")}
+RUTA_CORTA = {"prodigi-app": "Prodigi", "frame-it-easy-app": "Frame It Easy",
+              "prodigi-api": "Prodigi (API)", "manual": "Manual", "desconocida": "no está claro",
+              "varias": "dos imprentas"}
+
+
 def _precio(p: Producto) -> str:
     if p.precio_min is None:
         return "—"
@@ -326,44 +335,212 @@ def _precio(p: Producto) -> str:
     return f"{usd(p.precio_min)}–{usd(p.precio_max)}"
 
 
-def catalogo(productos: list[Producto], obras: int, filtro: str, fuentes, now: datetime,
-             banner: str = "") -> str:
+def _rutas(rutas) -> str:
+    if not rutas:
+        return "—"
+    return ", ".join(RUTA_CORTA.get(r, r) for r in sorted(rutas))
+
+
+def _ficha_avisos(f) -> list[str]:
+    a = list(f.producto.avisos)
+    p = f.producto
+    if p.estado == "publicado":
+        if "varias" in p.rutas or {"prodigi-app", "frame-it-easy-app"} <= p.rutas:
+            a.append("Está en dos imprentas: un pedido podría imprimirse dos veces")
+        elif p.rutas & {"manual", "desconocida"}:
+            a.append("Ninguna imprenta recibe sus pedidos (ubicación “Manual”)")
+        if f.archivos_mal:
+            a.append(f"{f.archivos_mal} variante(s) con archivo que no sirve para su tamaño")
+    return a
+
+
+def catalogo(fichas: list, originales: list, datos: list[Dato], filtro: str, fuentes,
+             now: datetime, banner: str = "") -> str:
     filtros = (("todo", "Todo"), ("venta", "En venta"), ("avisos", "Con avisos"),
-               ("ocultos", "Ocultos o borrador"))
+               ("ocultos", "Ocultos o borrador"), ("mx", "Originales MX"))
+    filtro = filtro if filtro in dict(filtros) else "todo"
     tabs = "".join(f'<a class="chip{" on" if k == filtro else ""}" href="/catalogo?f={k}">{t}</a>'
                    for k, t in filtros)
-    sel = {
-        "todo": productos,
-        "venta": [p for p in productos if p.estado == "publicado"],
-        "avisos": [p for p in productos if p.avisos],
-        "ocultos": [p for p in productos if p.estado in ("pausado", "borrador")],
-    }.get(filtro, productos)
     badge = {"publicado": "ok", "en-aprobacion": "amber", "borrador": "gray", "pausado": "gray",
              "retirado": "gray"}
+    sel = {
+        "venta": [f for f in fichas if f.producto.estado == "publicado"],
+        "avisos": [f for f in fichas if _ficha_avisos(f)],
+        "ocultos": [f for f in fichas if f.producto.estado in ("pausado", "borrador")],
+        "mx": [],
+    }.get(filtro, fichas)
     rows = []
-    for p in sel:
-        avisos = "".join(f'<div class="m w">{escape(a)}</div>' for a in p.avisos)
-        title = (f'<a href="{escape(p.url)}" rel="noopener">{escape(p.titulo)}</a>' if p.url
-                 else escape(p.titulo))
+    for f in sel:
+        p = f.producto
+        avisos = _ficha_avisos(f)
+        link = f"/catalogo/producto?c={escape(p.canal)}&amp;id={escape(p.id_producto)}"
+        obra = (f" · obra {escape(f.obras[0].get('obra_id', ''))}" if f.obras
+                else " · sin ligar a una obra")
         rows.append(
-            f'<div class="card{" alert" if p.avisos else ""}"><div class="row"><div>'
-            f'<div class="t">{title}</div>'
-            f'<div class="m">{escape(LINEA.get(p.linea, p.linea))} · {escape(CANAL.get(p.canal, p.canal))}'
-            f" · {p.variantes} variante(s) · {_precio(p)}</div>{avisos}</div>"
-            f'<span class="badge {badge.get(p.estado, "gray")}">'
+            f'<div class="card{" alert" if avisos else ""}"><div class="row"><div>'
+            f'<div class="t"><a href="{link}">{escape(p.titulo)}</a></div>'
+            f'<div class="m"><span class="tag">{escape(LINEA.get(p.linea, p.linea))}</span>'
+            f"{escape(CANAL.get(p.canal, p.canal))} · {p.variantes} variante(s) · {_precio(p)}</div>"
+            f'<div class="m">Imprime: {escape(_rutas(p.rutas))} · coste en {f.con_costo} de '
+            f"{p.variantes} · archivo sin revisar en {f.archivos_sin}{obra}</div>"
+            + "".join(f'<div class="m w">{escape(a)}</div>' for a in avisos)
+            + f'</div><span class="badge {badge.get(p.estado, "gray")}">'
             f"{escape(ESTADO_LISTADO.get(p.estado, p.estado))}</span></div></div>")
-    en_venta = sum(1 for p in productos if p.estado == "publicado")
+    if filtro in ("todo", "mx"):
+        rows.append("<h2>Originales México</h2>")
+        if not originales:
+            rows.append('<div class="card info"><div class="m">Aún no hay originales en la hoja. '
+                        "Se cargan en las pestañas Obras y Variantes (línea MX-original, tipo "
+                        "original). Mientras tanto se muestran como “—”, nunca como cero.</div></div>")
+        for o in originales:
+            ob = o.obra
+            med = (f"{ob.get('ancho_cm')} × {ob.get('alto_cm')} cm"
+                   if ob.get("ancho_cm") and ob.get("alto_cm") else "medidas —")
+            precio = (f"MX${o.precio_mxn:,.0f} con IVA" if o.precio_mxn is not None
+                      else "precio —")
+            est = ob.get("estado") or "—"
+            rows.append(
+                f'<div class="card"><div class="row"><div><div class="t">'
+                f"{escape(ob.get('titulo_es') or ob.get('titulo') or ob.get('obra_id', ''))}</div>"
+                f'<div class="m"><span class="tag">Original MX</span>{escape(ob.get("tecnica") or "técnica —")}'
+                f" · {escape(med)} · {escape(precio)}</div></div>"
+                f'<span class="badge {"ok" if est == "activa" else "gray"}">{escape(est)}</span>'
+                "</div></div>")
+    shop = fuentes["shopify"]
     body = (
-        f'<h1>Catálogo</h1><p class="sub">{len(productos)} producto(s) en canales, {en_venta} en '
-        f"venta. Obras en el catálogo maestro: {obras}"
-        + (" (se cargan en el paso de catálogo)" if not obras else "") + ". "
-        f"Shopify actualizado {hace(fuentes['shopify'].actualizado, now)}.</p>"
+        '<h1>Catálogo</h1><p class="sub">Productos de la tienda con sus variantes, quién los '
+        f"imprime, coste y archivo. Shopify actualizado {hace(shop.actualizado, now)}; "
+        "la hoja se lee al abrir esta pantalla.</p>"
+        f'<div class="grid">{"".join(_kpi(d, now) for d in datos)}</div>'
         f'<div class="tabs">{tabs}</div>'
         + ("".join(rows) or '<p class="empty">Nada en este filtro.</p>')
         + '<p class="legend">Solo lectura. Cambios de precio y publicaciones pasan por Aprobar. '
-        "Nunca se recorta, estira ni regenera una obra.</p>"
+        "Nunca se recorta, estira ni regenera una obra: la revisión de archivo solo avisa.</p>"
     )
     return page("Catálogo", "/catalogo", body, banner)
+
+
+def _celda(d: Dato) -> str:
+    title = f"{d.fuente} · {d.periodo} · {d.definicion}" + (f" · {d.nota}" if d.nota else "")
+    return f'<span title="{escape(title)}">{escape(valor(d))}</span> {calidad(d)}'
+
+
+def producto(f, fuentes, now: datetime, banner: str = "") -> str:
+    p = f.producto
+    shop = fuentes["shopify"]
+    rows = []
+    for v in f.variantes:
+        real = (f' · real {usd(v.margen_real)} en {v.ventas} venta(s)'
+                if v.margen_real is not None else "")
+        cls, txt = ARCHIVO[v.archivo.estado]
+        ruta_cls = "warn" if v.ruta in ("manual", "desconocida", "varias") else "gray"
+        rows.append(
+            f'<div class="card"><div class="row"><div><div class="t">{escape(v.etiqueta)}</div>'
+            f'<div class="m">{escape(v.sku) or "sin SKU"} · imprime '
+            f'<span class="badge {ruta_cls}">{escape(RUTA_CORTA.get(v.ruta, v.ruta) or "—")}</span></div>'
+            f'<div class="m">Coste {_celda(v.costo)} · Margen {_celda(v.margen)}{real}</div>'
+            f'<div class="m">Archivo <span class="badge {cls}">{txt}</span> '
+            f"{escape(v.archivo.motivo)}</div></div>"
+            f'<div class="r">{usd(v.precio) if v.precio is not None else "—"}</div></div></div>')
+    obras = "".join(
+        f'<div class="card"><div class="t">Obra {escape(o.get("obra_id", ""))}: '
+        f'{escape(o.get("titulo") or o.get("titulo_es") or "—")}</div>'
+        f'<div class="m">Colección {escape(o.get("coleccion") or "—")} · '
+        f'{escape(o.get("orientacion") or "orientación —")} · versión aprobada '
+        f'{escape(o.get("version_aprobada") or "—")}</div></div>' for o in f.obras
+    ) or ('<div class="card info"><div class="m">Sin ligar a una obra: ninguna variante tiene '
+          "fila en Variantes con obra_id.</div></div>")
+    avisos = "".join(f'<div class="card alert"><div class="m w">{escape(a)}</div></div>'
+                     for a in _ficha_avisos(f))
+    tienda = (f' · <a href="{escape(p.url)}" rel="noopener">ver en la tienda</a>' if p.url else "")
+    body = (
+        f'<p class="sub"><a href="/catalogo">← Catálogo</a></p><h1>{escape(p.titulo)}</h1>'
+        f'<p class="sub">{escape(LINEA.get(p.linea, p.linea))} · {escape(CANAL.get(p.canal, p.canal))}'
+        f" · {escape(ESTADO_LISTADO.get(p.estado, p.estado))}{tienda}. "
+        f"Shopify actualizado {fecha(shop.actualizado)} ({hace(shop.actualizado, now)}).</p>"
+        f"{avisos}<h2>Obra</h2>{obras}<h2>Variantes ({len(f.variantes)})</h2>"
+        f"{''.join(rows)}"
+        '<p class="legend">Precio e imprenta: Shopify (ubicación de inventario de cada variante). '
+        "Coste: cotización en Variantes.costo_usd (impresión + envío a EUA), estimado. Margen "
+        "estimado = precio − comisión estimada 2.9% + 30¢ − coste; sin descuentos, impuestos ni "
+        "anuncios. “real” = promedio de ventas con costos reales de Prodigi. Archivo: "
+        "resolución y proporción del archivo de impresión para el tamaño; nunca se recorta ni "
+        "se estira. “—” = falta el dato.</p>"
+    )
+    return page(p.titulo, "/catalogo", body, banner)
+
+
+# --- Contenido --------------------------------------------------------------------------------
+
+GATE_BADGE = {"ok": ("ok", "Aprobado"), "pendiente": ("amber", "Por aprobar"),
+              "no-hace-falta": ("gray", "Sin pedir")}
+
+
+def _pieza(p, now: datetime, con_fecha: bool = True) -> str:
+    from .contenido import PLATAFORMA
+
+    r = p.row
+    meta = [PLATAFORMA.get(p.plataforma, p.plataforma or "—"), r.get("formato") or "formato —",
+            {"en": "inglés", "es": "español"}.get(r.get("idioma") or "", "idioma —")]
+    if con_fecha:
+        meta.append(fecha(p.fecha) if p.fecha else "sin fecha")
+    if p.obra:
+        meta.append(f"obra {p.obra}")
+    texto = (f'<details><summary>Texto</summary><pre>{escape(r.get("texto"))}</pre></details>'
+             if r.get("texto") else "")
+    archivo = (f'<div class="m">Imagen: {escape(r.get("archivo"))} (original, sin recortar)</div>'
+               if r.get("archivo") else "")
+    if p.estado == "publicado":
+        res = r.get("resultado") or "—"
+        url = (f' · <a href="{escape(r.get("url"))}" rel="noopener">ver publicación</a>'
+               if r.get("url") else " · sin enlace")
+        archivo += f'<div class="m">Resultado: {escape(res)}{url}</div>'
+    cls, corto = (("warn", "Sin aprobación válida") if p.gate.alerta
+                  else GATE_BADGE.get(p.gate.estado, ("gray", "Revisar")))
+    w = " w" if p.gate.alerta else ""
+    return (f'<div class="card{" alert" if p.gate.alerta else ""}"><div class="row"><div>'
+            f'<div class="t">{escape(p.titulo)}</div>'
+            f'<div class="m">{escape(" · ".join(meta))}</div>'
+            f'<div class="m{w}">{escape(p.gate.texto)}</div>{archivo}{texto}</div>'
+            f'<span class="badge {cls}">{corto}</span></div></div>')
+
+
+def contenido_view(ps: list, datos: list[Dato], plataforma: str, now: datetime,
+                   banner: str = "") -> str:
+    from .contenido import ESTADO, calendario
+
+    chips = "".join(
+        f'<a class="chip{" on" if k == plataforma else ""}" href="/contenido{"?pl=" + k if k else ""}">'
+        f"{t}</a>" for k, t in (("", "Todas"), ("instagram", "Instagram"),
+                                ("pinterest", "Pinterest")))
+    body = ['<h1>Contenido</h1><p class="sub">Calendario y cola de publicaciones por plataforma, '
+            "de la pestaña Contenido (se lee al abrir). Solo lectura: nada se publica sin tu "
+            "aprobación del texto e imagen exactos.</p>",
+            f'<div class="grid">{"".join(_kpi(d, now) for d in datos)}</div>',
+            f'<div class="tabs">{chips}</div>']
+    if not ps:
+        body.append('<div class="card info"><div class="m">Aún no hay piezas en la pestaña '
+                    "Contenido. Cada fila es una publicación, reel, story o pin: plataforma, "
+                    "formato, idioma, texto, archivo de imagen y fecha.</div></div>")
+    cal = calendario(ps, now)
+    body.append("<h2>Próximos 14 días</h2>")
+    if not cal:
+        body.append('<p class="empty">Nada con fecha en los próximos 14 días.</p>')
+    for dia_, items in cal:
+        body.append(f'<p class="meta"><strong>{fecha(dia_, hora=False)}</strong></p>')
+        body.append("".join(_pieza(p, now) for p in items))
+    for estado, titulo in ESTADO.items():
+        items = [p for p in ps if p.estado == estado]
+        if estado == "publicado":
+            items = sorted(items, key=lambda p: p.fecha or now, reverse=True)[:20]
+        if not items:
+            continue
+        body.append(f'<h2 class="{"warn" if estado == "fallido" else ""}">{titulo} ({len(items)})</h2>')
+        body.append("".join(_pieza(p, now) for p in items))
+    body.append('<p class="legend">Los textos para EUA van en inglés. Las imágenes son los '
+                "archivos originales aprobados: nunca se recortan, estiran ni regeneran. "
+                "Resultados “—” hasta conectar Instagram y Pinterest.</p>")
+    return page("Contenido", "/contenido", "".join(body), banner)
 
 
 # --- Fuentes ----------------------------------------------------------------------------------

@@ -40,6 +40,8 @@ ESTADOS_PEDIDO = (
     "cancelado", "reembolsado", "excepcion",
 )
 ESTADOS_CONTENIDO = ("idea", "borrador", "aprobado", "programado", "publicado", "fallido")
+PLATAFORMAS_CONTENIDO = ("instagram", "pinterest", "otro")
+FORMATOS_CONTENIDO = ("post", "carrusel", "reel", "story", "pin", "video-pin", "otro")
 # What needs Lorena's approval before it happens (from her list: publish, spend, refund)
 TIPOS_APROBACION = (
     "listado",            # publish or change a listing on Shopify, Etsy or the Mexico site
@@ -114,6 +116,9 @@ TABS: tuple[Tab, ...] = (
             "sku", "obra_id", "linea", "tipo", "tamano", "papel", "marco",
             "pod_proveedor", "pod_sku", "archivo_impresion", "costo_usd", "precio_usd",
             "precio_mxn_con_iva", "estado", "actualizado",
+            # pixel size of archivo_impresion ("7200x9600") for the print-file check;
+            # costo_usd = print + Prodigi shipping to the US, from a quote (an estimate)
+            "archivo_px",
         ),
         validaciones={"linea": LINEAS, "tipo": TIPOS_VARIANTE, "estado": ESTADOS_VARIANTE},
     ),
@@ -187,9 +192,12 @@ TABS: tuple[Tab, ...] = (
         columnas=(
             "contenido_id", "linea", "obra_id", "plataforma", "formato", "idioma", "estado",
             "aprobacion_id", "programado_para", "url", "resultado", "calidad_dato",
+            # what gets approved: the exact text and the approved image file (never edited)
+            "titulo", "texto", "archivo",
         ),
         validaciones={
             "linea": LINEAS, "estado": ESTADOS_CONTENIDO, "idioma": ("en", "es"),
+            "plataforma": PLATAFORMAS_CONTENIDO, "formato": FORMATOS_CONTENIDO,
             "calidad_dato": CALIDAD_DATO,
         },
     ),

@@ -56,6 +56,7 @@ One row per: Un producto vendible (SKU). Key: `sku`.
 | `precio_mxn_con_iva` |  |
 | `estado` | borrador, activa, descontinuada |
 | `actualizado` |  |
+| `archivo_px` |  |
 
 ### Listados
 
@@ -173,8 +174,8 @@ One row per: Una publicación, reel, story o pin. Key: `contenido_id`.
 | `contenido_id` |  |
 | `linea` | US-POD, MX-original |
 | `obra_id` |  |
-| `plataforma` |  |
-| `formato` |  |
+| `plataforma` | instagram, pinterest, otro |
+| `formato` | post, carrusel, reel, story, pin, video-pin, otro |
 | `idioma` | en, es |
 | `estado` | idea, borrador, aprobado, programado, publicado, fallido |
 | `aprobacion_id` |  |
@@ -182,6 +183,9 @@ One row per: Una publicación, reel, story o pin. Key: `contenido_id`.
 | `url` |  |
 | `resultado` |  |
 | `calidad_dato` | real, estimado, faltante |
+| `titulo` |  |
+| `texto` |  |
+| `archivo` |  |
 
 ### Campanas
 
