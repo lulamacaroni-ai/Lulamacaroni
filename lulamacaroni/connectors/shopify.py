@@ -78,7 +78,7 @@ class ShopifyError(RuntimeError):
 class ShopifyClient:
     store_domain: str
     client_id: str
-    client_secret: str
+    client_secret: str = field(repr=False)
     api_version: str = DEFAULT_API_VERSION
     timeout: float = 30.0
     session: requests.Session | None = None
