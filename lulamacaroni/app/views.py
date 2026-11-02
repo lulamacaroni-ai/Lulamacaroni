@@ -231,8 +231,24 @@ def _pedido(p: Pedido) -> str:
         f'<div class="m">{escape(prods)}</div>'
         f'<div class="m">{fecha(p.fecha)} · {escape(ESTADO_PEDIDO.get(p.estado, p.estado))} · '
         f"imprime: {escape(rutas)}{track}</div>{extra}</div>"
-        f'<div class="r">{usd(p.neto)}<div class="m">neto</div></div></div></div>'
+        f'<div class="r">{usd(p.neto)}<div class="m">neto</div>{_margen(p)}</div></div></div>'
     )
+
+
+FALTA_TXT = {"comision_canal": "comisión", "costo_pod": "coste de impresión",
+             "envio_pod": "envío de imprenta"}
+
+
+def _margen(p: Pedido) -> str:
+    if p.calidad_margen == "faltante" or p.margen is None:
+        falta = ", ".join(FALTA_TXT.get(c, c) for c in p.faltan) or "costos"
+        return (f'<div class="m" title="Falta: {escape(falta)}">margen —</div>'
+                f'<div class="m">falta {escape(falta)}</div>')
+    text = usd(p.margen)
+    if p.calidad_margen == "estimado":
+        return f'<div class="m">margen ~{text}</div><div class="m">estimado</div>'
+    return f'<div class="m">margen {text}</div>'
+
 
 
 def pedidos(lista: list[Pedido], fuentes: dict[str, EstadoFuente], now: datetime,
@@ -252,8 +268,9 @@ def pedidos(lista: list[Pedido], fuentes: dict[str, EstadoFuente], now: datetime
         body.append(f'<h2 class="{cls}">{escape(title)} ({len(items)})</h2>')
         body.append("".join(_pedido(p) for p in items) or '<p class="empty">Ninguno.</p>')
     body.append('<p class="legend">Shopify solo comparte los últimos 60 días de pedidos con esta '
-                "app. Los pedidos de prueba no se cuentan. Coste de Prodigi y comisiones aparecen "
-                "cuando se conecten Prodigi y los pagos.</p>")
+                "app. Los pedidos de prueba no se cuentan. Margen = neto + envío cobrado − "
+                "comisión de Shopify Payments − coste y envío de Prodigi, sin impuestos ni "
+                "anuncios. “—” = falta un costo (nunca se cuenta como cero); “~” = estimado.</p>")
     return page("Pedidos", "/pedidos", "".join(body), banner)
 
 
