@@ -54,6 +54,7 @@ python -m lulamacaroni.app.server --demo                # back office app with s
 python -m lulamacaroni.connectors.shopify               # live read-only sync (to the sheet, or data/libro/ without a key)
 python -m lulamacaroni.app.server                       # back office app on that data, http://127.0.0.1:8770
 python -m lulamacaroni.app.alertas                      # today's summary + alerts as plain text (read-only)
+python -m lulamacaroni.sync                             # daily routine: Shopify + Prodigi syncs, failures marked in Fuentes, then alerts
 python -m lulamacaroni.checks.resolution obra.jpg 8x10 12x16 18x24
 ```
 
