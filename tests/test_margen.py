@@ -10,7 +10,6 @@ from lulamacaroni.connectors.shopify import (
 from lulamacaroni.localbook import LocalWorkbook
 from lulamacaroni.margen import calcular, faltan, recalcular
 from lulamacaroni.schema import validate_row
-from tests.test_shopify import _order
 
 NOW = datetime(2026, 11, 2, 20, 0, tzinfo=timezone.utc)
 
@@ -40,8 +39,18 @@ def test_fee_split_by_sale_share_adds_up_to_the_cent():
     assert split_fee(None, [1, 2]) == ["", ""]
 
 
+def _line(n, gross):
+    return {"id": f"gid://shopify/LineItem/{n}", "sku": f"S{n}", "quantity": 1, "name": "x",
+            "originalTotalSet": {"shopMoney": {"amount": str(gross)}},
+            "totalDiscountSet": {"shopMoney": {"amount": "0"}}, "taxLines": []}
+
+
 def test_order_rows_carry_real_fee():
-    rows = order_to_rows(_order(transactions=[_tx(fee="10.00")]))
+    order = {"legacyResourceId": "500", "name": "#1001", "createdAt": "2026-11-14T10:00:00Z",
+             "test": False, "currencyCode": "USD", "displayFinancialStatus": "PAID",
+             "lineItems": {"nodes": [_line(1, 90), _line(2, 240), _line(3, 20)]},
+             "transactions": [_tx(fee="10.00")]}
+    rows = order_to_rows(order)
     assert round(sum(r["comision_canal"] for r in rows), 2) == 10.0
     for r in rows:
         assert validate_row("Pedidos", r) == []
