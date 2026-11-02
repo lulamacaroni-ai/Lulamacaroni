@@ -109,6 +109,13 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `calidad_dato` | real, estimado, faltante |
 | `producto` |  |
 | `numero_canal` |  |
+| `origen_estado` | ok, sin-recorrido, pendiente, sin-permiso |
+| `origen_fuente` |  |
+| `origen_tipo` |  |
+| `utm_fuente` |  |
+| `utm_medio` |  |
+| `utm_campana` |  |
+| `referente` |  |
 
 ### Pagos
 
@@ -207,6 +214,47 @@ One row per: Un anuncio o conjunto de anuncios, por día. Key: `campana_dia_id`.
 | `compras_atribuidas` |  |
 | `valor_atribuido` |  |
 | `calidad_dato` | real, estimado, faltante |
+
+### Publicidad
+
+One row per: Una campaña planeada: creativo, destino, presupuesto y su aprobación. Key: `campana_id`.
+
+| Column | Allowed values |
+|---|---|
+| `campana_id` |  |
+| `linea` | US-POD, MX-original |
+| `plataforma` | meta, pinterest, google, etsy-ads, otro |
+| `nombre` |  |
+| `obra_id` |  |
+| `objetivo` |  |
+| `audiencia` |  |
+| `destino` | shopify, etsy, sitio-mx, instagram, otro |
+| `url_destino` |  |
+| `utm_campana` |  |
+| `texto` |  |
+| `archivo` |  |
+| `presupuesto_diario_usd` |  |
+| `presupuesto_total_usd` |  |
+| `inicio` |  |
+| `fin` |  |
+| `estado` | idea, borrador, por-aprobar, aprobada, activa, pausada, terminada, rechazada |
+| `aprobacion_id` |  |
+| `nota` |  |
+
+### Topes
+
+One row per: El límite de gasto que Lorena fija por plataforma de anuncios. Key: `plataforma`.
+
+| Column | Allowed values |
+|---|---|
+| `plataforma` | meta, pinterest, google, etsy-ads, otro |
+| `linea` | US-POD, MX-original |
+| `tope_diario_usd` |  |
+| `tope_mensual_usd` |  |
+| `cambio_max_pct` |  |
+| `definido_por` |  |
+| `actualizado` |  |
+| `nota` |  |
 
 ### Consultas
 

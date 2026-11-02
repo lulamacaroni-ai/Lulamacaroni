@@ -29,8 +29,8 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
                  "sin-conectar": "sin conectar"}
 
 NAV = (("/", "Inicio"), ("/alertas", "Alertas"), ("/aprobar", "Aprobar"),
-       ("/catalogo", "Catálogo"), ("/contenido", "Contenido"), ("/pedidos", "Pedidos"),
-       ("/fuentes", "Fuentes"))
+       ("/catalogo", "Catálogo"), ("/contenido", "Contenido"), ("/publicidad", "Anuncios"),
+       ("/pedidos", "Pedidos"), ("/fuentes", "Fuentes"))
 
 CSS = """
 :root{--bg:#FBF8F3;--card:#FFFFFF;--ink:#1C1C1E;--muted:#4A4A50;--line:#E0D6C8;
@@ -94,8 +94,8 @@ td{padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
 .tablebox{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 .empty{color:var(--muted);text-align:center;padding:20px}
 nav.bottom{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
-display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.7rem;z-index:5}
-nav.bottom a{padding:14px 2px;color:var(--muted);min-height:48px}
+display:flex;overflow-x:auto;text-align:center;font-size:.7rem;z-index:5}
+nav.bottom a{flex:1 0 auto;padding:14px 8px;color:var(--muted);min-height:48px}
 nav.bottom a.on{color:var(--ink);font-weight:700}
 .tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:6px;font-size:.8rem}
 .meta{color:var(--muted);font-size:.85rem}
@@ -138,7 +138,12 @@ def usd(v: float) -> str:
 def valor(d: Dato) -> str:
     if d.calidad == "faltante" or d.valor is None:
         return "—"
-    text = usd(d.valor) if d.formato == "usd" else f"{d.valor:,.0f}"
+    if d.formato == "usd":
+        text = usd(d.valor)
+    elif d.formato == "x":
+        text = f"{d.valor:,.2f}×"
+    else:
+        text = f"{d.valor:,.0f}"
     return ("~" + text) if d.calidad == "estimado" else text
 
 
@@ -541,6 +546,146 @@ def contenido_view(ps: list, datos: list[Dato], plataforma: str, now: datetime,
                 "archivos originales aprobados: nunca se recortan, estiran ni regeneran. "
                 "Resultados “—” hasta conectar Instagram y Pinterest.</p>")
     return page("Contenido", "/contenido", "".join(body), banner)
+
+
+# --- Publicidad -------------------------------------------------------------------------------
+
+CAMP_BADGE = {"ok": ("ok", "Aprobada"), "pendiente": ("amber", "Por aprobar"),
+              "sin-solicitud": ("amber", "Falta pedirla"), "no-hace-falta": ("gray", "Sin pedir"),
+              "rechazado": ("gray", "Rechazada")}
+DESTINO = {"shopify": "Shopify", "etsy": "Etsy", "sitio-mx": "Sitio MX",
+           "instagram": "perfil de Instagram", "otro": "otro destino"}
+
+
+def _dinero(v: float | None) -> str:
+    return "—" if v is None else usd(v)
+
+
+def _campana(c, now: datetime) -> str:
+    from .publicidad import PLATAFORMA
+
+    r = c.row
+    meta = [PLATAFORMA.get(c.plataforma, c.plataforma or "plataforma —"),
+            "a " + DESTINO.get(r.get("destino") or "", r.get("destino") or "destino —")]
+    if c.obra:
+        meta.append(f"obra {c.obra}")
+    fechas = f"{r.get('inicio') or 'inicio —'} a {r.get('fin') or 'sin fin'}"
+    plan = (f"Presupuesto {_dinero(c.diario)}/día · total {_dinero(c.total)} · {fechas}"
+            + (f" · este mes hasta {usd(c.plan_mes)}" if c.plan_mes is not None else ""))
+    extra = []
+    if r.get("objetivo") or r.get("audiencia"):
+        extra.append(f"Objetivo: {r.get('objetivo') or '—'} · audiencia: {r.get('audiencia') or '—'}")
+    extra.append(f"utm_campaign: {r.get('utm_campana') or '—'}")
+    texto = (f'<details><summary>Texto e imagen</summary><pre>{escape(r.get("texto") or "—")}'
+             f'</pre><div class="m">Imagen: {escape(r.get("archivo") or "—")} (original, sin '
+             "recortar ni regenerar)</div></details>")
+    resultados = " · ".join(f"{escape(d.etiqueta)}: {_celda(d)}" for d in
+                            [c.shopify] + c.plataforma_datos)
+    alert = c.gate.alerta or c.excede
+    cls, corto = (("warn", "Revisar") if alert
+                  else CAMP_BADGE.get(c.gate.estado, ("gray", "Revisar")))
+    avisos = "".join(f'<div class="m w">{escape(a)}</div>' for a in c.avisos
+                     if a != c.gate.texto)
+    return (f'<div class="card{" alert" if alert else ""}"><div class="row"><div>'
+            f'<div class="t">{escape(c.nombre)}</div>'
+            f'<div class="m">{escape(" · ".join(meta))}</div>'
+            f'<div class="m">{escape(plan)}</div>'
+            + "".join(f'<div class="m">{escape(x)}</div>' for x in extra)
+            + f'<div class="m{" w" if c.gate.alerta else ""}">{escape(c.gate.texto)}</div>'
+            f"{avisos}<div class=\"m\">Resultados: {resultados}</div>{texto}</div>"
+            f'<span class="badge {cls}">{corto}</span></div></div>')
+
+
+def _plan_celda(planeado: float, pasa: bool) -> str:
+    text = "~" + usd(planeado)
+    return f'<span class="badge warn">{text}</span><br><span class="meta">pasa el tope</span>' if pasa else text
+
+
+def publicidad_view(cs: list, datos: list[Dato], filas_origen: list, plan: list,
+                    per, fuentes: dict[str, EstadoFuente], now: datetime,
+                    banner: str = "", faltan_tabs: list[str] | None = None) -> str:
+    from .publicidad import ESTADO, ORIGEN, PLATAFORMA
+
+    chips = "".join(
+        f'<a class="chip{" on" if k == per.clave else ""}" href="/publicidad?p={k}">{t}</a>'
+        for k, t in (("hoy", "Hoy"), ("7", "7 días"), ("30", "30 días")))
+    body = ['<h1>Publicidad</h1><p class="sub">Campañas planeadas, topes de gasto y de dónde '
+            "llegan los pedidos. Solo lectura: nada se lanza ni cambia de presupuesto sin tu "
+            "aprobación, y desde aquí nunca se envía nada a Meta, Pinterest ni Google.</p>",
+            f'<div class="chips">{chips}<span class="vs">{escape(per.texto)}</span></div>',
+            f'<div class="grid">{"".join(_kpi(d, now) for d in datos)}</div>']
+    if faltan_tabs:
+        body.insert(1, '<div class="card alert"><div class="m w">La hoja aún no tiene la(s) '
+                    f'pestaña(s) {escape(", ".join(faltan_tabs))}. Se crean con '
+                    "<code>python -m lulamacaroni.setup_workbook</code> (solo agrega pestañas y "
+                    "encabezados; no borra nada).</div></div>")
+
+    body.append("<h2>Topes por plataforma</h2>")
+    if not plan:
+        body.append('<div class="card info"><div class="m">Aún no hay topes. Se definen en la '
+                    "pestaña Topes: tope diario, tope mensual y cambio máximo de presupuesto "
+                    "por plataforma. Sin tope no se pide aprobación para ninguna campaña.</div></div>")
+    else:
+        rows = []
+        for pp in plan:
+            t = pp.tope
+            cambio = f"{t.cambio_pct:.0f}%" if t and t.cambio_pct is not None else "—"
+            corto = {"meta": "Meta", "etsy-ads": "Etsy Ads"}.get(
+                pp.plataforma, PLATAFORMA.get(pp.plataforma, pp.plataforma))
+            rows.append(
+                f"<tr><td><strong>{escape(corto)}</strong><br><span class='meta'>cambio máx. "
+                f"{escape(cambio)}</span></td><td>{_dinero(t.diario if t else None)}</td>"
+                f"<td>{_dinero(t.mensual if t else None)}</td>"
+                f"<td>{_plan_celda(pp.aprobado, pp.pasa)}</td><td>~{usd(pp.propuesto)}</td></tr>")
+        body.append("<div class='tablebox'><table><thead><tr><th>Plataforma</th><th>Tope diario"
+                    "</th><th>Tope mensual</th><th>Aprobado este mes</th>"
+                    "<th>Propuesto</th></tr>"
+                    f"</thead><tbody>{''.join(rows)}</tbody></table></div>"
+                    '<p class="legend">Topes: pestaña Topes, los fija Lore. Plan del mes '
+                    "(estimado): presupuesto diario × días de este mes dentro de sus fechas, "
+                    "con su total como límite. Aprobado = campañas aprobadas o activas con "
+                    "aprobación válida; propuesto = las que esperan aprobación o aún no la piden. "
+                    "Cambio máx.: el mayor cambio de presupuesto que se te propondrá de una "
+                    "vez.</p>")
+
+    if not cs:
+        body.append('<h2>Campañas</h2><div class="card info"><div class="m">Aún no hay campañas en '
+                    "la pestaña Publicidad. Cada fila es una campaña: plataforma, obra, texto, "
+                    "imagen, destino, utm_campaign, presupuesto diario y total, fechas. Para "
+                    "pedirte la aprobación: <code>python -m lulamacaroni.app.publicidad --pedir "
+                    "ID</code>.</div></div>")
+    for estado, titulo in ESTADO.items():
+        items = [c for c in cs if c.estado == estado]
+        if not items:
+            continue
+        warn = "warn" if any(c.alerta for c in items) else ""
+        body.append(f'<h2 class="{warn}">{escape(titulo)} ({len(items)})</h2>')
+        body.append("".join(_campana(c, now) for c in items))
+
+    shop = fuentes["shopify"]
+    body.append("<h2>¿De dónde llegan los pedidos? (Shopify)</h2>")
+    if not shop.conectada:
+        body.append('<p class="empty">Shopify no está conectado todavía.</p>')
+    elif not filas_origen:
+        body.append(f'<p class="empty">Sin pedidos de Shopify en el periodo ({escape(per.texto)}). '
+                    "Cero real, no un dato faltante.</p>")
+    else:
+        rows = "".join(
+            f"<tr><td><strong>{escape(ORIGEN[f.clave])}</strong></td>"
+            f"<td>{f.pedidos}</td><td>{f.pedidos_anuncio if f.clave != 'sin-dato' else '—'}</td>"
+            f"<td>{f.pedidos_organico if f.clave != 'sin-dato' else '—'}</td>"
+            f"<td>{usd(f.ventas)}</td><td>—</td></tr>" for f in filas_origen)
+        body.append("<div class='tablebox'><table><thead><tr><th>Origen</th><th>Pedidos</th>"
+                    "<th>De anuncio</th><th>Orgánico</th><th>Ventas netas</th>"
+                    f"<th>Según la plataforma</th></tr></thead><tbody>{rows}</tbody></table></div>")
+    body.append(
+        '<p class="legend">Origen: recorrido del cliente de Shopify (última visita antes del '
+        f"pedido: UTM y sitio que la refirió). Shopify actualizado {hace(shop.actualizado, now)}. "
+        "Cada pedido cuenta una vez. “Según la plataforma” es lo que Meta o Pinterest se "
+        "atribuyen con su propia ventana; va aparte y nunca se suma a lo de Shopify (fuente no "
+        "conectada: “—”). Etsy no comparte el origen de la visita: sus anuncios se medirán con "
+        "los reportes de Etsy Ads. Una atribución no prueba que el anuncio causó la venta.</p>")
+    return page("Publicidad", "/publicidad", "".join(body), banner)
 
 
 # --- Fuentes ----------------------------------------------------------------------------------

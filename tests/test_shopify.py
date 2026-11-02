@@ -256,3 +256,41 @@ def test_listing_route_from_stock_locations():
     rows = product_to_listing_rows({**PRODUCT, "variants": {"nodes": [
         {**PRODUCT["variants"]["nodes"][0], **v("L-fie")}]}}, "2026-11-02T19:00:00+00:00", routes)
     assert rows[0]["ruta_pod"] == "frame-it-easy-app"
+
+
+# --- attribution (customer journey) -----------------------------------------------------------
+
+def _journey(**visit):
+    base = {"source": "instagram", "sourceType": "AD",
+            "referrerUrl": "https://l.instagram.com/?u=https%3A%2F%2Fshop&e=private",
+            "utmParameters": {"source": "Instagram", "medium": "paid_social",
+                              "campaign": "garden-otono"}}
+    return {"ready": True, "lastVisit": {**base, **visit}}
+
+
+def test_order_origin_keeps_utm_and_referrer_domain_only():
+    from lulamacaroni.connectors.shopify import order_origin
+
+    o = order_origin(_order(customerJourneySummary=_journey()))
+    assert o == {"origen_estado": "ok", "origen_fuente": "instagram", "origen_tipo": "ad",
+                 "utm_fuente": "instagram", "utm_medio": "paid_social",
+                 "utm_campana": "garden-otono", "referente": "l.instagram.com"}
+    assert order_origin(_order(customerJourneySummary=None))["origen_estado"] == "sin-recorrido"
+    assert order_origin(_order(customerJourneySummary={"ready": False}))["origen_estado"] == "pendiente"
+    # field not requested: say so, and don't blank what an earlier sync stored
+    assert order_origin(_order()) == {"origen_estado": "sin-permiso"}
+    rows = order_to_rows(_order(customerJourneySummary=_journey()))
+    assert all(r["utm_campana"] == "garden-otono" for r in rows)
+    assert all(validate_row("Pedidos", r) == [] for r in rows)
+
+
+def test_orders_drop_the_journey_block_if_shopify_denies_it():
+    denied = Resp(200, {"errors": [{"message": "Access denied for customerJourneySummary field.",
+                                    "path": ["orders", "nodes", 0, "customerJourneySummary"],
+                                    "extensions": {"code": "ACCESS_DENIED"}}]})
+    c = client(TOKEN, denied, page("orders", [_order()]))
+    orders = list(c.iter_orders())
+    assert len(orders) == 1
+    assert "customerJourneySummary" in c.session.calls[1][1]["json"]["query"]
+    last = c.session.calls[-1][1]["json"]["query"]
+    assert "customerJourneySummary" not in last and "fulfillmentOrders" in last

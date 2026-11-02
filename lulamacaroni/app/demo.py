@@ -23,6 +23,20 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
                 "ultima_sync": _iso(now), "id_producto_canal": str(pi),
                 "ruta_pod": ("prodigi-app", "frame-it-easy-app", "manual")[pi - 1],
             })
+    origenes = [  # last visit per Shopify's customer journey (invented)
+        {"origen_estado": "ok", "origen_fuente": "instagram", "origen_tipo": "ad",
+         "utm_fuente": "instagram", "utm_medio": "paid_social", "utm_campana": "garden-otono",
+         "referente": "l.instagram.com"},
+        {"origen_estado": "ok", "origen_fuente": "pinterest", "origen_tipo": "",
+         "utm_fuente": "", "utm_medio": "", "utm_campana": "", "referente": "pinterest.com"},
+        {"origen_estado": "ok", "origen_fuente": "direct", "origen_tipo": "", "utm_fuente": "",
+         "utm_medio": "", "utm_campana": "", "referente": ""},
+        {"origen_estado": "ok", "origen_fuente": "instagram", "origen_tipo": "ad",
+         "utm_fuente": "instagram", "utm_medio": "paid_social", "utm_campana": "garden-otono",
+         "referente": "l.instagram.com"},
+        {"origen_estado": "sin-recorrido"},
+        {},
+    ]
     pedidos = []
     plan = [  # (days ago, product, size idx, price, state, route, refund)
         (0.2, 0, 2, 100.0, "recibido", "prodigi-app", 0),
@@ -43,6 +57,7 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
             "numero_canal": f"#{n}",
             # Shopify Payments fee (2.9% + 30¢); Prodigi charge once Prodigi has billed it
             "comision_canal": round(price * 0.029 + 0.30, 2),
+            **origenes[n - 1001],
             **({"pod_pedido_id": f"ord_demo{n}", "costo_pod": 28.0 + 6 * vi, "envio_pod": 7.5}
                if ruta == "prodigi-app" and estado != "recibido" else {}),
         })
@@ -91,8 +106,52 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
          "plataforma": "instagram", "formato": "carrusel", "idioma": "es", "estado": "idea",
          "titulo": "Proceso de la obra (idea)"},
     ]
+    hoy = now.date()
+    publicidad = [
+        {"campana_id": "pub-1", "linea": "US-POD", "plataforma": "meta",
+         "nombre": "Garden otoño (ejemplo)", "obra_id": "DEMO-001", "objetivo": "ventas",
+         "audiencia": "EUA, decoración botánica", "destino": "shopify",
+         "url_destino": "https://example.com/products/sample-garden",
+         "utm_campana": "garden-otono", "texto": "Sample ad copy for the garden print.",
+         "archivo": "demo-garden-v1.tif", "presupuesto_diario_usd": 8,
+         "presupuesto_total_usd": 200, "inicio": str(hoy - timedelta(days=10)),
+         "fin": str(hoy + timedelta(days=15)), "estado": "activa"},
+        {"campana_id": "pub-2", "linea": "US-POD", "plataforma": "pinterest",
+         "nombre": "Harbor pins (ejemplo)", "obra_id": "DEMO-002", "objetivo": "tráfico",
+         "destino": "shopify", "utm_campana": "harbor-pins", "texto": "Sample pin ad copy.",
+         "archivo": "demo-harbor-v1.tif", "presupuesto_diario_usd": 5,
+         "presupuesto_total_usd": 70, "inicio": str(hoy + timedelta(days=2)),
+         "fin": str(hoy + timedelta(days=16)), "estado": "borrador"},
+        {"campana_id": "pub-3", "linea": "US-POD", "plataforma": "meta",
+         "nombre": "Owl prueba (ejemplo)", "destino": "shopify", "texto": "Sample test ad.",
+         "presupuesto_diario_usd": 25, "inicio": str(hoy + timedelta(days=5)),
+         "estado": "por-aprobar"},
+    ]
+    topes_rows = [
+        {"plataforma": "meta", "linea": "US-POD", "tope_diario_usd": 15, "tope_mensual_usd": 300,
+         "cambio_max_pct": 20, "definido_por": "Lore (ejemplo)", "actualizado": _iso(now)},
+        {"plataforma": "pinterest", "linea": "US-POD", "tope_diario_usd": 10,
+         "tope_mensual_usd": 150, "cambio_max_pct": 20, "definido_por": "Lore (ejemplo)",
+         "actualizado": _iso(now)},
+    ]
     return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos,
-            "Obras": obras, "Variantes": variantes, "Contenido": contenido}
+            "Obras": obras, "Variantes": variantes, "Contenido": contenido,
+            "Publicidad": publicidad, "Topes": topes_rows}
+
+
+def seed_publicidad(book, store, now: datetime | None = None) -> None:
+    """Demo approvals: pub-1 approved (it is running), pub-2 waiting for Lore."""
+    from ..approval.gate import decide
+    from .publicidad import solicitar
+
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    # pub-1 shows as running, so it was approved before it started
+    book.upsert("Publicidad", [{"campana_id": "pub-1", "linea": "US-POD", "estado": "borrador"}])
+    rec = solicitar(book, store, "pub-1", creado_por="Ejemplo", now=now - timedelta(days=11))
+    decide(store, rec.aprobacion_id, aprobar=True, decidido_por="Lore (ejemplo)",
+           now=now - timedelta(days=11))
+    book.upsert("Publicidad", [{"campana_id": "pub-1", "linea": "US-POD", "estado": "activa"}])
+    solicitar(book, store, "pub-2", creado_por="Ejemplo", now=now)
 
 
 def fill_demo(book, now: datetime | None = None) -> None:

@@ -43,8 +43,8 @@ That's it. The code finds the sheet by its name among the files shared with the 
 pip install -e ".[google]"
 python -m lulamacaroni.google_check               # read-only: key, token, sheet, tabs
 python -m lulamacaroni.setup_workbook --dry-run   # preview
-python -m lulamacaroni.setup_workbook             # creates the 15 tabs with headers and dropdowns
-python -m lulamacaroni.google_check               # should end with "all 15 tabs present"
+python -m lulamacaroni.setup_workbook             # creates the 17 tabs with headers and dropdowns
+python -m lulamacaroni.google_check               # should end with "all 17 tabs present"
 ```
 
 `google_check` prints only the service account email, never the key, and says which step fails and what to do (for example, which domain to allow). `setup_workbook` never deletes a tab or a row, so it is safe to re-run when the schema changes. The empty default tab ("Hoja 1") can be deleted by hand.

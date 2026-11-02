@@ -57,7 +57,7 @@ SHEET = [{"id": "abc", "name": "LulaMacaroni Operaciones"}]
 
 def test_all_good(monkeypatch):
     code, text = _run(monkeypatch, SHEET, TABS)
-    assert code == 0 and "all 15 tabs" in text and "bot@proyecto" in text
+    assert code == 0 and "all 17 tabs" in text and "bot@proyecto" in text
 
 
 def test_nothing_shared(monkeypatch):
@@ -67,7 +67,7 @@ def test_nothing_shared(monkeypatch):
 
 def test_tabs_missing(monkeypatch):
     code, text = _run(monkeypatch, SHEET, TABS[:3])
-    assert code == 1 and "12 of 15 tabs missing" in text and "setup_workbook" in text
+    assert code == 1 and "14 of 17 tabs missing" in text and "setup_workbook" in text
 
 
 def test_no_key(monkeypatch):

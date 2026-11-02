@@ -65,6 +65,16 @@ RUTAS_LISTADO = RUTAS_POD + ("varias",)
 
 CALIDAD_DATO = ("real", "estimado", "faltante")
 
+# Advertising (Lorena's requirements, sections 4, 11 and 14). Nothing is ever sent to an
+# ad platform from here: a campaign row is a plan, and launching it or changing its budget
+# needs her approval (tipo "anuncio" or "presupuesto") over the exact plan.
+PLATAFORMAS_ANUNCIOS = ("meta", "pinterest", "google", "etsy-ads", "otro")
+ESTADOS_CAMPANA = ("idea", "borrador", "por-aprobar", "aprobada", "activa", "pausada",
+                   "terminada", "rechazada")
+DESTINOS_ANUNCIO = ("shopify", "etsy", "sitio-mx", "instagram", "otro")
+# What Shopify's customer journey says about the visit that led to an order
+ESTADOS_ORIGEN = ("ok", "sin-recorrido", "pendiente", "sin-permiso")
+
 ORIENTACIONES = ("vertical", "horizontal", "cuadrada")
 
 
@@ -144,10 +154,14 @@ TABS: tuple[Tab, ...] = (
             "comision_canal", "costo_pod", "envio_pod", "reembolso", "margen_contribucion",
             "ruta_pod", "pod_pedido_id", "tracking", "estado", "calidad_dato",
             "producto", "numero_canal",
+            # attribution from Shopify's customer journey (last visit before the order):
+            # UTM tags and the referring site's domain only, never a full URL or the buyer
+            "origen_estado", "origen_fuente", "origen_tipo", "utm_fuente", "utm_medio",
+            "utm_campana", "referente",
         ),
         validaciones={
             "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,
-            "calidad_dato": CALIDAD_DATO,
+            "calidad_dato": CALIDAD_DATO, "origen_estado": ESTADOS_ORIGEN,
         },
     ),
     Tab(
@@ -211,6 +225,27 @@ TABS: tuple[Tab, ...] = (
             "valor_atribuido", "calidad_dato",
         ),
         validaciones={"linea": LINEAS, "calidad_dato": CALIDAD_DATO},
+    ),
+    Tab(
+        nombre="Publicidad",
+        fila="Una campaña planeada: creativo, destino, presupuesto y su aprobación",
+        clave="campana_id",
+        columnas=(
+            "campana_id", "linea", "plataforma", "nombre", "obra_id", "objetivo", "audiencia",
+            "destino", "url_destino", "utm_campana", "texto", "archivo",
+            "presupuesto_diario_usd", "presupuesto_total_usd", "inicio", "fin", "estado",
+            "aprobacion_id", "nota",
+        ),
+        validaciones={"linea": LINEAS, "plataforma": PLATAFORMAS_ANUNCIOS,
+                      "destino": DESTINOS_ANUNCIO, "estado": ESTADOS_CAMPANA},
+    ),
+    Tab(
+        nombre="Topes",
+        fila="El límite de gasto que Lorena fija por plataforma de anuncios",
+        clave="plataforma",
+        columnas=("plataforma", "linea", "tope_diario_usd", "tope_mensual_usd",
+                  "cambio_max_pct", "definido_por", "actualizado", "nota"),
+        validaciones={"plataforma": PLATAFORMAS_ANUNCIOS, "linea": LINEAS},
     ),
     Tab(
         nombre="Consultas",

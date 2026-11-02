@@ -48,6 +48,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlparse
 
 import requests
 
@@ -183,19 +184,37 @@ class ShopifyClient:
     def iter_orders(self, since: datetime | None = None) -> Iterator[dict]:
         query = f"updated_at:>='{since.isoformat()}'" if since else None
         variables = {"query": query}
-        try:
-            first = self.graphql(ORDERS_QUERY, {**variables, "first": 25, "after": None})
-        except ShopifyError as e:
-            if not _denied_field(e, "fulfillmentOrders"):
-                raise
-            # Missing fulfilment-order scopes: route by variant stock location instead.
-            yield from self.paginate(ORDERS_QUERY_BY_VARIANT, "orders", variables, page_size=25)
-            return
+        orders_q, by_variant_q = ORDERS_QUERY, ORDERS_QUERY_BY_VARIANT
+        for _ in range(3):  # at most: drop the journey block, then fall back to variants
+            try:
+                first = self.graphql(orders_q, {**variables, "first": 25, "after": None})
+                break
+            except ShopifyError as e:
+                if _denied_field(e, "customerJourneySummary") and JOURNEY_BLOCK in orders_q:
+                    orders_q = orders_q.replace(JOURNEY_BLOCK, "")
+                    by_variant_q = by_variant_q.replace(JOURNEY_BLOCK, "")
+                    continue
+                if not _denied_field(e, "fulfillmentOrders"):
+                    raise
+                # Missing fulfilment-order scopes: route by variant stock location instead.
+                yield from self._orders_by_variant(by_variant_q, variables)
+                return
+        else:
+            raise ShopifyError("Shopify kept denying fields of the orders query")
         conn = first["orders"]
         yield from conn["nodes"]
         if conn["pageInfo"]["hasNextPage"]:
-            yield from self.paginate(ORDERS_QUERY, "orders",
+            yield from self.paginate(orders_q, "orders",
                                      {**variables, "after": conn["pageInfo"]["endCursor"]},
+                                     page_size=25)
+
+    def _orders_by_variant(self, query: str, variables: dict) -> Iterator[dict]:
+        try:
+            yield from self.paginate(query, "orders", variables, page_size=25)
+        except ShopifyError as e:
+            if not (_denied_field(e, "customerJourneySummary") and JOURNEY_BLOCK in query):
+                raise
+            yield from self.paginate(query.replace(JOURNEY_BLOCK, ""), "orders", variables,
                                      page_size=25)
 
     def iter_payouts(self) -> Iterator[dict]:
@@ -296,10 +315,27 @@ query Orders($first: Int!, $after: String, $query: String) {
         kind status gateway
         fees { amount { amount } type }
       }
+      customerJourneySummary {
+        ready
+        lastVisit {
+          source sourceType referrerUrl
+          utmParameters { source medium campaign }
+        }
+      }
     }
   }
 }
 """
+
+# Attribution block, dropped if Shopify ever denies it so the order sync keeps working.
+JOURNEY_BLOCK = """
+      customerJourneySummary {
+        ready
+        lastVisit {
+          source sourceType referrerUrl
+          utmParameters { source medium campaign }
+        }
+      }"""
 
 # Same as ORDERS_QUERY minus fulfillmentOrders, plus each line's variant stock location.
 ORDERS_QUERY_BY_VARIANT = ORDERS_QUERY.replace("""
@@ -508,6 +544,7 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
     shipping = _money((order.get("shippingLine") or {}).get("originalPriceSet"))
     refunded = _money(order.get("totalRefundedSet"))
     estado = _order_state(order)
+    origin = order_origin(order)
     fees = split_fee(order_fee(order), [
         _money(li["originalTotalSet"]) - _money(li["totalDiscountSet"]) for li in lines])
     rows = []
@@ -536,8 +573,45 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
             "estado": estado,
             "producto": li.get("name") or "",
             "numero_canal": order.get("name") or "",
+            **origin,
         })
     return rows
+
+
+def _domain(url: str | None) -> str:
+    """Only the referring site's host (no path or query, which can carry personal data)."""
+    if not url:
+        return ""
+    host = urlparse(url if "//" in url else "//" + url).hostname or ""
+    return host.removeprefix("www.").lower()
+
+
+def order_origin(order: dict) -> dict:
+    """Where the visit that led to the order came from, per Shopify's customer journey.
+
+    Uses the last visit before the order (Shopify's own last-click view). Keeps UTM tags
+    and the referrer's domain only. ``origen_estado`` says whether Shopify had a journey
+    for the order, is still computing it, or the field was not requested (no permission).
+    """
+    if "customerJourneySummary" not in order:
+        return {"origen_estado": "sin-permiso"}
+    journey = order.get("customerJourneySummary")
+    if journey is not None and journey.get("ready") is False:
+        return {"origen_estado": "pendiente"}
+    visit = (journey or {}).get("lastVisit")
+    if not visit:
+        return {"origen_estado": "sin-recorrido", "origen_fuente": "", "origen_tipo": "",
+                "utm_fuente": "", "utm_medio": "", "utm_campana": "", "referente": ""}
+    utm = visit.get("utmParameters") or {}
+    return {
+        "origen_estado": "ok",
+        "origen_fuente": (visit.get("source") or "").lower(),
+        "origen_tipo": (visit.get("sourceType") or "").lower(),
+        "utm_fuente": (utm.get("source") or "").lower(),
+        "utm_medio": (utm.get("medium") or "").lower(),
+        "utm_campana": utm.get("campaign") or "",
+        "referente": _domain(visit.get("referrerUrl")),
+    }
 
 
 PAYOUT_STATUS = {"SCHEDULED": "programado", "IN_TRANSIT": "en-transito", "PAID": "pagado",

@@ -33,7 +33,7 @@ FUENTE_CONTABLE = "quickbooks"
 @dataclass
 class Alerta:
     nivel: str
-    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido
+    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido | publicidad
     titulo: str
     detalle: str
     fuente: str
@@ -206,6 +206,22 @@ def catalogo_y_contenido(fichas, piezas, fuentes: dict[str, m.EstadoFuente],
     return out
 
 
+def publicidad(cs, now: datetime) -> list[Alerta]:
+    """Campaigns over a spend limit, or approved/running without a valid approval."""
+    from .publicidad import PLATAFORMA, alertas as pub_alertas
+
+    out = []
+    for c in pub_alertas(cs):
+        out.append(Alerta(
+            URGENTE if c.estado in ("aprobada", "activa") else ATENCION, "publicidad",
+            f"Campaña “{c.nombre}” ({PLATAFORMA.get(c.plataforma, c.plataforma or 'anuncios')})",
+            "; ".join(c.avisos) + ". Ningún anuncio se lanza ni cambia de presupuesto sin tu "
+            "aprobación del plan exacto.",
+            "Libro de datos (Publicidad + Topes + Aprobaciones)", now, "/publicidad",
+            f"Revisa la campaña “{c.nombre}”", 8))
+    return out
+
+
 def acciones(alertas: list[Alerta], n: int = 3) -> list[Alerta]:
     """The day's priority actions: the first ``n`` alerts that ask for something."""
     return [a for a in alertas if a.accion and a.nivel != INFO][:n]
@@ -286,6 +302,7 @@ def resumen_dia(d, now: datetime | None = None) -> ResumenDia:
                      d.pendientes, d.fuentes_rows)
     lista += catalogo_y_contenido(getattr(d, "fichas", []), getattr(d, "piezas", []),
                                   d.fuentes, now)
+    lista += publicidad(getattr(d, "campanas_plan", []), now)
     lista.sort(key=lambda a: (NIVELES.index(a.nivel), a.prioridad))
     ranuras = [ventas_canal(d.pedidos_rows, d.fuentes, f, c, per) for f, c in CANALES_VENTA]
     ranuras.append(gastos_mes(d.gastos, d.fuentes, now))

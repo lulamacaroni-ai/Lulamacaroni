@@ -96,13 +96,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.demo:
         from ..approval.server import seed_demo
-        from .demo import fill_demo
+        from .demo import fill_demo, seed_publicidad
 
         tmp = Path(tempfile.mkdtemp(prefix="lula-demo-"))
         Handler.book = LocalWorkbook(tmp / "libro")
         Handler.store = JsonStore(tmp / "aprobaciones.json")
         fill_demo(Handler.book)
         seed_demo(Handler.store)
+        seed_publicidad(Handler.book, Handler.store)
         Handler.banner = "Datos de ejemplo: nada de esto es real."
     else:
         Handler.book = open_workbook()

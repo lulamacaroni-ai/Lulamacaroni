@@ -245,4 +245,4 @@ def test_sheets_store_round_trip_keeps_the_gate_intact():
 
 
 def test_every_schema_tab_is_known():
-    assert len(TABS) == 15
+    assert len(TABS) == 17
