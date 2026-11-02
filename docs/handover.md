@@ -12,7 +12,7 @@ Jon builds everything, and then Lorena runs it from her own Claude account. Thes
 2. This repo, already in her GitHub account (`lulamacaroni-ai`).
 3. A Claude cloud environment holding the API keys as secrets. They are entered once and never put in the repo or chat.
 4. Her own Google Drive and Gmail connectors on the business account.
-5. The Spanish runbook ([runbook-es.md](runbook-es.md)).
+5. The Spanish runbook ([runbook-es.md](runbook-es.md)). Jon's setup and operations guide is [operations.md](operations.md).
 
 ## Handover checklist
 
