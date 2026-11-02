@@ -170,7 +170,9 @@ class ShopifyClient:
 
     # -- reads -------------------------------------------------------------------
     def iter_products(self) -> Iterator[dict]:
-        return self.paginate(PRODUCTS_QUERY, "products")
+        # One product per page: up to 100 variants x their stock locations stays well
+        # under Shopify's 1,000-point query cost limit.
+        return self.paginate(PRODUCTS_QUERY, "products", page_size=1)
 
     def location_routes(self) -> dict[str, str]:
         """Location id -> ruta_pod, from the store's fulfilment services."""
@@ -251,7 +253,10 @@ query Products($first: Int!, $after: String) {
     nodes {
       id legacyResourceId title handle status onlineStoreUrl vendor productType updatedAt
       variants(first: 100) {
-        nodes { id legacyResourceId sku title price inventoryQuantity }
+        nodes {
+          id legacyResourceId sku title price inventoryQuantity
+          inventoryItem { inventoryLevels(first: 5) { nodes { location { id } } } }
+        }
       }
     }
   }
@@ -363,7 +368,29 @@ def route_for(location_name: str | None) -> str:
     return "manual" if name else "desconocida"
 
 
-def product_to_listing_rows(product: dict, now: str) -> list[dict]:
+def listing_route(variant: dict, location_routes: dict[str, str] | None) -> str:
+    """Who prints a variant, from the locations that stock it.
+
+    One print location -> that route; only locations that are no print app (the store's
+    "Manual" location) -> ``manual``; two different print apps -> ``varias`` (an order
+    could be printed twice); a print app plus a manual location, or no location data ->
+    ``desconocida`` (Shopify's location priority decides, so nobody can say who prints).
+    """
+    if location_routes is None:
+        return ""
+    levels = (((variant.get("inventoryItem") or {}).get("inventoryLevels") or {})
+              .get("nodes") or [])
+    routes = {location_routes.get(n["location"]["id"], "manual") for n in levels}
+    printers = routes - {"manual"}
+    if len(printers) > 1:
+        return "varias"
+    if printers and routes == printers:
+        return printers.pop()
+    return "manual" if routes == {"manual"} else "desconocida"
+
+
+def product_to_listing_rows(product: dict, now: str,
+                            location_routes: dict[str, str] | None = None) -> list[dict]:
     rows = []
     for v in product["variants"]["nodes"]:
         rows.append({
@@ -380,6 +407,8 @@ def product_to_listing_rows(product: dict, now: str) -> list[dict]:
             "estado": LISTING_STATUS.get(product["status"], "borrador"),
             "ultima_sync": now,
             "id_producto_canal": product["legacyResourceId"],
+            **({"ruta_pod": listing_route(v, location_routes)} if location_routes is not None
+               else {}),
         })
     return rows
 
@@ -553,9 +582,10 @@ PAYOUT_SCOPES = "read_shopify_payments_payouts y read_shopify_payments_accounts"
 
 def sync(client: ShopifyClient, since_days: int = 60) -> tuple[list[dict], list[dict]]:
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    listings = [r for p in client.iter_products() for r in product_to_listing_rows(p, now)]
-    since = datetime.now(timezone.utc) - timedelta(days=since_days)
     routes = client.location_routes()
+    listings = [r for p in client.iter_products()
+                for r in product_to_listing_rows(p, now, routes)]
+    since = datetime.now(timezone.utc) - timedelta(days=since_days)
     orders = [r for o in client.iter_orders(since) for r in order_to_rows(o, routes)]
     return listings, orders
 

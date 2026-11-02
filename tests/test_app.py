@@ -119,21 +119,11 @@ def test_catalog_groups_variants_and_flags_missing_skus():
     assert owl.precio_min == 80 and owl.precio_max == 120
 
 
-def test_three_actions_in_priority_order(book, store):
-    request_approval(store, tipo="precio", linea="US-POD", resumen="x", contenido={"a": 1},
-                     creado_por="test")
-    d = Datos(book, store, NOW)
-    acciones = m.acciones_del_dia(d.pendientes, d.pedidos, d.productos, d.fuentes, d.excepciones)
-    assert len(acciones) == 3
-    assert acciones[0].enlace == "/aprobar"
-    assert "#1003" in acciones[1].texto
-
-
 # --- screens -----------------------------------------------------------------------------
 
 @pytest.mark.parametrize("path,needle", [
     ("/", "Hola, Lore"), ("/pedidos", "Necesitan atención"), ("/catalogo", "Catálogo"),
-    ("/fuentes", "sin conectar"), ("/aprobar", "Aprobaciones"),
+    ("/fuentes", "sin conectar"), ("/aprobar", "Aprobaciones"), ("/alertas", "Urgente"),
 ])
 def test_every_screen_renders(book, store, path, needle):
     html = render(path, {}, Datos(book, store, NOW), banner="Datos de ejemplo")

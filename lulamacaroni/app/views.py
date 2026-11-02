@@ -28,8 +28,8 @@ ESTADO_LISTADO = {"publicado": "En venta", "pausado": "Oculto", "borrador": "Bor
 ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
                  "sin-conectar": "sin conectar"}
 
-NAV = (("/", "Inicio"), ("/aprobar", "Aprobar"), ("/catalogo", "Catálogo"),
-       ("/pedidos", "Pedidos"), ("/fuentes", "Fuentes"))
+NAV = (("/", "Inicio"), ("/alertas", "Alertas"), ("/aprobar", "Aprobar"),
+       ("/catalogo", "Catálogo"), ("/pedidos", "Pedidos"), ("/fuentes", "Fuentes"))
 
 CSS = """
 :root{--bg:#FBF8F3;--card:#FFFFFF;--ink:#1C1C1E;--muted:#4A4A50;--line:#E0D6C8;
@@ -78,6 +78,11 @@ display:flex;flex-direction:column;gap:2px;min-width:0}
 .row .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .card.alert{border-color:var(--warn);background:var(--warn-bg)}
 .card.alert .m.w{color:var(--warn)}
+.card.aviso{border-color:var(--amber);background:var(--amber-bg)}
+.card.info{border-style:dashed}
+.counts{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+@media (min-width:720px){.slots{grid-template-columns:repeat(3,1fr)}}
 .badge{font-size:.72rem;font-weight:600;border-radius:999px;padding:3px 8px;white-space:nowrap}
 .badge.ok{background:var(--ok-bg);color:var(--ok)}.badge.amber{background:var(--amber-bg);color:var(--amber)}
 .badge.gray{background:var(--chip);color:var(--muted)}.badge.warn{background:var(--warn-bg);color:var(--warn)}
@@ -88,7 +93,7 @@ td{padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
 .tablebox{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 .empty{color:var(--muted);text-align:center;padding:20px}
 nav.bottom{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
-display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-size:.78rem;z-index:5}
+display:grid;grid-template-columns:repeat(6,1fr);text-align:center;font-size:.74rem;z-index:5}
 nav.bottom a{padding:14px 2px;color:var(--muted);min-height:48px}
 nav.bottom a.on{color:var(--ink);font-weight:700}
 .tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:6px;font-size:.8rem}
@@ -180,40 +185,77 @@ def _kpi(d: Dato, now: datetime) -> str:
             f"<details><summary>¿De dónde sale?</summary><dl>{dl}</dl></details></div>")
 
 
-def inicio(res: Resumen, acciones, fuentes: dict[str, EstadoFuente], now: datetime,
+def _alerta_meta(a, now: datetime) -> str:
+    cuando = f"{fecha(a.actualizado)} ({hace(a.actualizado, now)})" if a.actualizado else "—"
+    return f"Fuente: {a.fuente} · actualizado: {cuando}"
+
+
+def inicio(res: Resumen, rd, fuentes: dict[str, EstadoFuente], now: datetime,
            nombre: str = "Lore", banner: str = "") -> str:
+    """Home: the daily summary first, then the period numbers."""
+    from .alertas import ATENCION, URGENTE
+
     per = res.periodo
     chips = "".join(
         f'<a class="chip{" on" if k == per.clave else ""}" href="/?p={k}">{t}</a>'
         for k, t in (("hoy", "Hoy"), ("7", "7 días"), ("30", "30 días")))
-    ventas = res.datos[0]
-    if ventas.calidad == "faltante":
-        que_paso = "Aún no hay canales de venta conectados."
-    else:
-        que_paso = (f"{res.pedidos_periodo} pedido(s), {usd(ventas.valor)} netos "
-                    f"({per.nombre.lower()}, {escape(ventas.fuente)}).")
-        if res.mas_vendido:
-            que_paso += f" Lo más vendido: “{escape(res.mas_vendido)}”."
-        if ventas.nota:
-            que_paso += f" {escape(ventas.nota)}"
-    acc = "".join(f'<li><a href="{escape(a.enlace)}">{escape(a.texto)}</a></li>' for a in acciones)
+    acc = "".join(f'<li><a href="{escape(a.enlace)}">{escape(a.accion)}</a></li>'
+                  for a in rd.acciones)
     acc = f"<ol>{acc}</ol>" if acc else "<p>Nada urgente. 🎨</p>"
-    alertas = sum(1 for f in fuentes.values() if f.estado in ("error", "atrasada"))
+    urg, ate = rd.cuenta(URGENTE), rd.cuenta(ATENCION)
+    counts = (
+        (f'<a href="/alertas" class="badge warn">{urg} urgente(s)</a>' if urg else "")
+        + (f'<a href="/alertas" class="badge amber">{ate} aviso(s)</a>' if ate else "")
+        or '<span class="badge ok">Nada pendiente</span>')
     body = (
         f'<div class="row"><div><p class="sub">Resumen del día · {fecha(now, hora=False)}</p>'
-        f"<h1>Hola, {escape(nombre)}</h1></div>"
-        + (f'<a href="/fuentes" class="badge warn">{alertas} fuente(s) con aviso</a>' if alertas else "")
-        + "</div>"
-        f'<div class="card summary"><p><strong>Qué pasó:</strong> {que_paso}</p>'
+        f"<h1>Hola, {escape(nombre)}</h1></div></div>"
+        f'<div class="card summary"><p><strong>Qué pasó:</strong> {escape(rd.que_paso)}</p>'
+        f'<p><strong>Qué requiere tu atención:</strong></p><div class="counts">{counts}'
+        '<a href="/alertas" class="chip">Ver alertas</a></div>'
         f"<p><strong>Tus 3 acciones de hoy</strong></p>{acc}"
-        '<p class="meta">Por ahora este resumen sale de reglas fijas; Claude lo redactará cuando '
-        "el Asistente esté listo.</p></div>"
+        '<p class="meta">Sale de reglas fijas sobre los datos conectados; Claude lo redactará '
+        "cuando el Asistente esté listo.</p></div>"
+        "<h2>Hoy por canal y contabilidad</h2>"
+        f'<div class="slots">{"".join(_kpi(d, now) for d in rd.ranuras)}</div>'
         f'<div class="chips">{chips}<span class="vs">vs {escape(per.comparacion)}</span></div>'
         f'<div class="grid">{"".join(_kpi(d, now) for d in res.datos)}</div>'
         '<p class="legend"><a href="/fuentes">Fuentes</a>: 0 = cero real · — = falta el dato · '
         "~ = estimado. Toca “¿De dónde sale?” en cualquier número.</p>"
     )
     return page("Inicio", "/", body, banner)
+
+
+# --- Alertas ----------------------------------------------------------------------------------
+
+def alertas_view(lista, fuentes: dict[str, EstadoFuente], now: datetime,
+                 banner: str = "") -> str:
+    from .alertas import NIVEL_NOMBRE, NIVELES
+
+    clase = {"urgente": "alert", "atencion": "aviso", "info": "info"}
+    body = ['<h1>Alertas</h1><p class="sub">Lo que necesita a una persona, lo más importante '
+            "primero. Solo lectura: los arreglos se hacen en la tienda o pasan por Aprobar.</p>"]
+    for nivel in NIVELES:
+        items = [a for a in lista if a.nivel == nivel]
+        if nivel == "info" and not items:
+            continue
+        h = " warn" if nivel == "urgente" else ""
+        body.append(f'<h2 class="{h.strip()}">{escape(NIVEL_NOMBRE[nivel])} ({len(items)})</h2>')
+        if not items:
+            body.append('<p class="empty">Ninguna.</p>')
+        for a in items:
+            accion = (f'<div class="m"><strong>Qué hacer:</strong> {escape(a.accion)}</div>'
+                      if a.accion else "")
+            body.append(
+                f'<div class="card {clase[nivel]}"><div class="t">'
+                f'<a href="{escape(a.enlace)}">{escape(a.titulo)}</a></div>'
+                f'<div class="m">{escape(a.detalle)}</div>{accion}'
+                f'<div class="m">{escape(_alerta_meta(a, now))}</div></div>')
+    sin = [f.info.nombre for f in fuentes.values() if f.estado == "sin-conectar"]
+    if sin:
+        body.append(f'<p class="legend">Fuentes aún no conectadas: {escape(", ".join(sin))}. '
+                    "Sus números se muestran como “—”, nunca como cero.</p>")
+    return page("Alertas", "/alertas", "".join(body), banner)
 
 
 # --- Pedidos ----------------------------------------------------------------------------------

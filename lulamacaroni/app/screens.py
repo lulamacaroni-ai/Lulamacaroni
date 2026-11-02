@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from . import alertas as al
 from . import metrics as m
 from . import views
 
@@ -22,7 +23,9 @@ class Datos:
         self.excepciones = book.read("Excepciones")
         self.obras = book.read("Obras")
         self.pagos = book.read("Pagos")
-        self.fuentes = m.estado_fuentes(book.read("Fuentes"), self.now)
+        self.gastos = book.read("Gastos")
+        self.fuentes_rows = book.read("Fuentes")
+        self.fuentes = m.estado_fuentes(self.fuentes_rows, self.now)
         self.approvals = store.all()
         self.pedidos = m.agrupar_pedidos(self.pedidos_rows)
         self.productos = m.agrupar_catalogo(self.listados)
@@ -39,9 +42,9 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
         clave = clave if clave in m.PERIODOS else "7"
         res = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, m.periodo(clave, d.now),
                         d.pagos)
-        acciones = m.acciones_del_dia(d.pendientes, d.pedidos, d.productos, d.fuentes,
-                                      d.excepciones)
-        return views.inicio(res, acciones, d.fuentes, d.now, banner=banner)
+        return views.inicio(res, al.resumen_dia(d), d.fuentes, d.now, banner=banner)
+    if path == "/alertas":
+        return views.alertas_view(al.resumen_dia(d).alertas, d.fuentes, d.now, banner)
     if path == "/pedidos":
         return views.pedidos(d.pedidos, d.fuentes, d.now, banner)
     if path == "/catalogo":

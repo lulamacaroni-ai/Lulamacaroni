@@ -26,3 +26,20 @@ def test_plan_marks_existing_tabs_as_updates():
     lines = plan({"Obras"})
     assert lines[0].startswith("update headers")
     assert lines[1].startswith("create tab")
+
+
+class _WS:
+    def __init__(self, title, values=()):
+        self.title, self._values = title, [list(r) for r in values]
+
+
+def test_only_an_empty_starter_tab_is_removed():
+    from lulamacaroni.setup_workbook import removable_starter_tabs
+
+    tabs = [_WS("Obras", [["obra_id"]]), _WS("Sheet1"), _WS("Hoja 1", [["", " "]]),
+            _WS("Notas"), _WS("Sheet2")]
+    out = removable_starter_tabs(tabs, lambda w: w._values)
+    assert [w.title for w in out] == ["Sheet1", "Hoja 1"]
+    assert removable_starter_tabs([_WS("Sheet1", [["hola"]])], lambda w: w._values) == []
+    # never removes the only tab
+    assert removable_starter_tabs([_WS("Sheet1")], lambda w: w._values) == []

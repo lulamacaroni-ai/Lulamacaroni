@@ -35,9 +35,9 @@ FUENTES = (
     FuenteInfo("shopify", "Shopify", "API", 26, "conectada"),
     FuenteInfo("shopify-pagos", "Pagos de Shopify (payouts)", "API", 26,
                "falta dar a la app de Shopify los permisos de pagos"),
-    FuenteInfo("etsy", "Etsy", "API", 26, "siguiente conector"),
+    FuenteInfo("etsy", "Etsy", "API", 26, "aún no existe la cuenta de Etsy"),
     FuenteInfo("prodigi", "Prodigi", "API", 26, ""),  # text from prodigi_fase()
-    FuenteInfo("quickbooks", "QuickBooks", "API", 48, "cuando exista la cuenta"),
+    FuenteInfo("quickbooks", "QuickBooks", "API", 48, "aún no existe la cuenta de QuickBooks"),
     FuenteInfo("meta", "Meta Ads", "API", 26, "requiere revisión de app de Meta"),
     FuenteInfo("instagram", "Instagram", "API", 26, "requiere revisión de app de Meta"),
     FuenteInfo("pinterest", "Pinterest + Ads", "API", 26, "requiere aprobación de Pinterest"),
@@ -451,6 +451,7 @@ class Producto:
     sin_sku: int
     precio_min: float | None
     precio_max: float | None
+    rutas: frozenset[str] = frozenset()   # who prints its variants; empty = not synced yet
 
     @property
     def avisos(self) -> list[str]:
@@ -475,44 +476,8 @@ def agrupar_catalogo(listados: list[dict]) -> list[Producto]:
             canal, pid, (first.get("titulo_en_canal") or "").split(" / ")[0],
             first.get("linea", ""), first.get("estado", ""), first.get("url", ""), len(rows),
             sum(1 for r in rows if not r.get("sku")),
-            min(precios) if precios else None, max(precios) if precios else None))
+            min(precios) if precios else None, max(precios) if precios else None,
+            frozenset(r["ruta_pod"] for r in rows if r.get("ruta_pod"))))
     orden = {"publicado": 0, "en-aprobacion": 1, "borrador": 2, "pausado": 3, "retirado": 4}
     out.sort(key=lambda p: (orden.get(p.estado, 9), p.titulo.lower()))
     return out
-
-
-# --- the three actions of the day -------------------------------------------------------------
-
-@dataclass
-class Accion:
-    texto: str
-    enlace: str
-    prioridad: int
-
-
-def acciones_del_dia(pendientes: int, pedidos: list[Pedido], productos: list[Producto],
-                     fuentes: dict[str, EstadoFuente], excepciones: list[dict]) -> list[Accion]:
-    """Rule-based for now; the Asistente (Claude) writes this summary in a later slice."""
-    acciones: list[Accion] = []
-    if pendientes:
-        acciones.append(Accion(f"Aprobar {pendientes} cosa(s) pendiente(s)", "/aprobar", 10))
-    for p in pedidos:
-        if p.grupo == "atencion":
-            acciones.append(Accion(f"Revisar el pedido #{p.numero} ({p.canal.capitalize()}): {p.atencion.lower()}",
-                                   "/pedidos", 20))
-    abiertas = [e for e in excepciones if e.get("estado") in ("abierta", "en-curso")]
-    if abiertas:
-        acciones.append(Accion(f"Resolver {len(abiertas)} excepción(es) abierta(s)", "/pedidos", 25))
-    for f in fuentes.values():
-        if f.estado in ("error", "atrasada"):
-            acciones.append(Accion(f"{f.info.nombre}: datos {'con error' if f.estado == 'error' else 'atrasados'}",
-                                   "/fuentes", 30))
-    sin_sku = [p for p in productos if p.avisos]
-    if sin_sku:
-        acciones.append(Accion(f"{len(sin_sku)} producto(s) publicados con variantes sin SKU",
-                               "/catalogo", 40))
-    for f in fuentes.values():
-        if f.info.clave == "etsy" and not f.conectada:
-            acciones.append(Accion("Conectar Etsy para ver todas las ventas de EUA", "/fuentes", 50))
-    acciones.sort(key=lambda a: a.prioridad)
-    return acciones[:3]

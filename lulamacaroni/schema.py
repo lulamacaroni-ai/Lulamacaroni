@@ -58,6 +58,8 @@ ESTADOS_EXCEPCION = ("abierta", "en-curso", "resuelta")
 # Who fulfils an order line. Orders the Prodigi (or Frame It Easy) app already routes
 # must never also be sent through the Prodigi API, or the print is made twice.
 RUTAS_POD = ("prodigi-app", "frame-it-easy-app", "prodigi-api", "manual", "desconocida")
+# A listing can also sit at two print locations at once ("varias"): double-print risk.
+RUTAS_LISTADO = RUTAS_POD + ("varias",)
 
 CALIDAD_DATO = ("real", "estimado", "faltante")
 
@@ -122,9 +124,10 @@ TABS: tuple[Tab, ...] = (
         columnas=(
             "listado_ref", "sku", "linea", "canal", "id_en_canal", "titulo_en_canal", "url",
             "precio", "inventario", "estado", "aprobacion_id", "ultima_sync",
-            "id_producto_canal",
+            "id_producto_canal", "ruta_pod",
         ),
-        validaciones={"linea": LINEAS, "canal": CANALES, "estado": ESTADOS_LISTADO},
+        validaciones={"linea": LINEAS, "canal": CANALES, "estado": ESTADOS_LISTADO,
+                      "ruta_pod": RUTAS_LISTADO},
     ),
     Tab(
         nombre="Pedidos",

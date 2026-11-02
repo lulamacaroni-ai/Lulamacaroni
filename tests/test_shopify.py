@@ -237,3 +237,22 @@ def test_other_graphql_errors_are_not_swallowed_by_fallback():
     c = client(TOKEN, Resp(200, {"errors": [{"message": "boom"}]}))
     with pytest.raises(ShopifyError):
         list(c.iter_orders())
+
+
+def test_listing_route_from_stock_locations():
+    from lulamacaroni.connectors.shopify import listing_route
+
+    routes = {"L-prodigi": "prodigi-app", "L-fie": "frame-it-easy-app"}
+
+    def v(*locs):
+        return {"inventoryItem": {"inventoryLevels": {"nodes": [{"location": {"id": x}}
+                                                                 for x in locs]}}}
+    assert listing_route(v("L-prodigi"), routes) == "prodigi-app"
+    assert listing_route(v("L-manual"), routes) == "manual"
+    assert listing_route(v("L-prodigi", "L-fie"), routes) == "varias"
+    assert listing_route(v("L-prodigi", "L-manual"), routes) == "desconocida"
+    assert listing_route(v(), routes) == "desconocida"
+    assert listing_route(v("L-prodigi"), None) == ""
+    rows = product_to_listing_rows({**PRODUCT, "variants": {"nodes": [
+        {**PRODUCT["variants"]["nodes"][0], **v("L-fie")}]}}, "2026-11-02T19:00:00+00:00", routes)
+    assert rows[0]["ruta_pod"] == "frame-it-easy-app"

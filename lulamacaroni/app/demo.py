@@ -21,6 +21,7 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
                 "titulo_en_canal": f"{title} / {size}", "url": "", "precio": 60 + 20 * vi,
                 "inventario": "", "estado": "publicado" if pi != 2 else "pausado",
                 "ultima_sync": _iso(now), "id_producto_canal": str(pi),
+                "ruta_pod": ("prodigi-app", "frame-it-easy-app", "manual")[pi - 1],
             })
     pedidos = []
     plan = [  # (days ago, product, size idx, price, state, route, refund)

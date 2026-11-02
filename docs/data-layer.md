@@ -76,6 +76,7 @@ One row per: Un SKU publicado en un canal. Key: `listado_ref`.
 | `aprobacion_id` |  |
 | `ultima_sync` |  |
 | `id_producto_canal` |  |
+| `ruta_pod` | prodigi-app, frame-it-easy-app, prodigi-api, manual, desconocida, varias |
 
 ### Pedidos
 

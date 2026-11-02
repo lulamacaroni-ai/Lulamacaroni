@@ -4,8 +4,10 @@ Usage:
     python -m lulamacaroni.setup_workbook --dry-run     # show what would change, no Google access
     python -m lulamacaroni.setup_workbook               # apply (needs the service account key)
 
-It only adds missing tabs and writes header rows and validations. It never deletes
-a tab or a data row, so it is safe to re-run after the schema grows.
+It only adds missing tabs and writes header rows and validations. It never deletes a
+data row, and the only tab it ever removes is Google's empty starter tab ("Sheet1" /
+"Hoja 1"), and only when it holds no value at all and the workbook's own tabs exist. So
+it is safe to re-run after the schema grows.
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ from .schema import TABS, Tab
 from .workbook import col_letter as _col_letter
 
 HEADER_ROWS = 1
+# Google's starter tab in English and Spanish accounts. Removed only while completely empty.
+STARTER_TABS = ("Sheet1", "Hoja 1", "Hoja1")
 VALIDATION_ROWS = 5000  # rows below the header that get dropdowns
 
 
@@ -62,6 +66,21 @@ def plan(existing_tabs: set[str]) -> list[str]:
     return lines
 
 
+def removable_starter_tabs(worksheets, values_of) -> list:
+    """Starter tabs that are safe to delete: a starter name, not a workbook tab, no values.
+
+    ``values_of(ws)`` returns the tab's cell values (``ws.get_all_values``). Never returns
+    every tab, so the workbook always keeps at least one.
+    """
+    ours = {t.nombre for t in TABS}
+    out = []
+    for ws in worksheets:
+        if ws.title in STARTER_TABS and ws.title not in ours:
+            if not any(str(c).strip() for row in values_of(ws) for c in row):
+                out.append(ws)
+    return out if len(out) < len(list(worksheets)) else []
+
+
 def apply() -> None:
     from .workbook import open_book
 
@@ -86,6 +105,9 @@ def apply() -> None:
 
     if requests:
         book.batch_update({"requests": requests})
+    for ws in removable_starter_tabs(book.worksheets(), lambda w: w.get_all_values()):
+        book.del_worksheet(ws)
+        print(f'removed empty starter tab "{ws.title}"')
     print(f"Done: {len(TABS)} tabs ready.")
 
 
