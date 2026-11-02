@@ -1,0 +1,25 @@
+[project]
+name = "lulamacaroni"
+version = "0.1.0"
+description = "Back office for Lula Macaroni: catalog, orders, approvals and margin for the US print-on-demand store and the Mexico originals catalog."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+google = [
+    "google-auth>=2.29",
+    "gspread>=6.0",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["lulamacaroni*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
