@@ -73,7 +73,8 @@ def _card(a: Approval, actionable: bool) -> str:
     return "".join(parts)
 
 
-def render(approvals: list[Approval], recent: int = 10) -> str:
+def render_cards(approvals: list[Approval], recent: int = 10) -> str:
+    """The page body (heading, pending cards, recent decisions), reused by the back office app."""
     pending = sorted((a for a in approvals if a.estado == "pendiente"), key=lambda a: a.creado_en)
     decided = sorted((a for a in approvals if a.estado != "pendiente"),
                      key=lambda a: a.decidido_en or a.creado_en, reverse=True)[:recent]
@@ -83,9 +84,13 @@ def render(approvals: list[Approval], recent: int = 10) -> str:
     if decided:
         body.append("<h2>Decididas recientemente</h2>")
         body.append("".join(_card(a, False) for a in decided))
+    return "".join(body)
+
+
+def render(approvals: list[Approval], recent: int = 10) -> str:
     return (
         "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>Aprobaciones</title><style>{CSS}</style></head>"
-        f"<body><main>{''.join(body)}</main></body></html>"
+        f"<body><main>{render_cards(approvals, recent)}</main></body></html>"
     )

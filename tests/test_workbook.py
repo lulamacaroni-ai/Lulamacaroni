@@ -62,3 +62,13 @@ def test_stamp_source():
     book = FakeBook()
     Workbook(book).stamp_source("shopify", rows=12)
     assert book.sheets["Fuentes"].values[1][0] == "shopify"
+
+
+def test_read_returns_dicts_by_schema_column_and_skips_blank_rows():
+    book = FakeBook()
+    cols = list(tab("Listados").columnas)
+    book.sheets["Listados"].values += [["shopify-1", "LM-1"], [""] * len(cols)]
+    rows = Workbook(book).read("Listados")
+    assert len(rows) == 1
+    assert rows[0]["listado_ref"] == "shopify-1" and rows[0]["sku"] == "LM-1"
+    assert rows[0]["precio"] == "" and set(rows[0]) == set(cols)

@@ -36,6 +36,7 @@ the extra scope (Shopify approval) or a one-time CSV export.
     python -m lulamacaroni.connectors.shopify --dry-run          # counts + sample rows
     python -m lulamacaroni.connectors.shopify --to-json exports/  # files, before the workbook exists
     python -m lulamacaroni.connectors.shopify                    # upsert into the workbook
+                                                                 # (local data/libro/ until the sheet exists)
 """
 
 from __future__ import annotations
@@ -337,6 +338,7 @@ def product_to_listing_rows(product: dict, now: str) -> list[dict]:
             "inventario": "" if v.get("inventoryQuantity") is None else v["inventoryQuantity"],
             "estado": LISTING_STATUS.get(product["status"], "borrador"),
             "ultima_sync": now,
+            "id_producto_canal": product["legacyResourceId"],
         })
     return rows
 
@@ -413,6 +415,7 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
             "tracking": ", ".join(dict.fromkeys(tracking_by_line.get(li["id"], []))),
             "estado": estado,
             "calidad_dato": "faltante",
+            "producto": li.get("name") or "",
         })
     return rows
 
@@ -454,9 +457,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {out}/shopify-*.json (git-ignored; holds order data, never commit)")
         return 0
 
-    from ..workbook import Workbook
+    from ..localbook import open_workbook
 
-    wb = Workbook.from_env()
+    wb = open_workbook()  # the Google Sheet if LULA_WORKBOOK_ID is set, else data/libro/
     wb.upsert("Listados", listings)
     wb.upsert("Pedidos", orders)
     wb.stamp_source("shopify", rows=len(listings) + len(orders),

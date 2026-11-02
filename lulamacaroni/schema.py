@@ -120,6 +120,7 @@ TABS: tuple[Tab, ...] = (
         columnas=(
             "listado_ref", "sku", "linea", "canal", "id_en_canal", "titulo_en_canal", "url",
             "precio", "inventario", "estado", "aprobacion_id", "ultima_sync",
+            "id_producto_canal",
         ),
         validaciones={"linea": LINEAS, "canal": CANALES, "estado": ESTADOS_LISTADO},
     ),
@@ -132,6 +133,7 @@ TABS: tuple[Tab, ...] = (
             "moneda", "venta_bruta", "descuento", "impuesto_cobrado", "envio_cobrado",
             "comision_canal", "costo_pod", "envio_pod", "reembolso", "margen_contribucion",
             "ruta_pod", "pod_pedido_id", "tracking", "estado", "calidad_dato",
+            "producto",
         ),
         validaciones={
             "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,

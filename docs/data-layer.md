@@ -75,6 +75,7 @@ One row per: Un SKU publicado en un canal. Key: `listado_ref`.
 | `estado` | borrador, en-aprobacion, publicado, pausado, retirado |
 | `aprobacion_id` |  |
 | `ultima_sync` |  |
+| `id_producto_canal` |  |
 
 ### Pedidos
 
@@ -104,6 +105,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `tracking` |  |
 | `estado` | recibido, enviado-a-pod, en-produccion, enviado, entregado, cancelado, reembolsado, excepcion |
 | `calidad_dato` | real, estimado, faltante |
+| `producto` |  |
 
 ### Pagos
 

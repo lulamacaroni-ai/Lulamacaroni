@@ -20,7 +20,9 @@ lulamacaroni/
   schema_doc.py        Regenerates docs/data-layer.md from the schema
   config.py            Reads settings from .env (never from code)
   approval/            Approval gate, store, and the Spanish approval page
-  workbook.py          Upsert rows into the workbook by key; stamps Fuentes
+  workbook.py          Read and upsert rows in the workbook by key; stamps Fuentes
+  localbook.py         Same thing in local JSON files (data/libro/) until the Google Sheet exists
+  app/                 The back office app: Inicio, Aprobar, Catálogo, Pedidos, Fuentes (Spanish)
   connectors/shopify.py  Shopify Admin GraphQL (client-credentials app): listings, orders, POD routing
   connectors/prodigi.py  Prodigi Print API v4 (orders, tracking, quotes, products)
   checks/resolution.py   Print-file resolution/proportion check, never crops or stretches
@@ -46,6 +48,9 @@ pytest                        # everything runs offline
 
 python -m lulamacaroni.setup_workbook --dry-run         # what the workbook will look like
 python -m lulamacaroni.approval.server --demo           # approval page with sample requests
+python -m lulamacaroni.app.server --demo                # back office app with sample data
+python -m lulamacaroni.connectors.shopify               # live read-only sync (to data/libro/ until the sheet exists)
+python -m lulamacaroni.app.server                       # back office app on that data, http://127.0.0.1:8770
 python -m lulamacaroni.checks.resolution obra.jpg 8x10 12x16 18x24
 ```
 
@@ -66,4 +71,5 @@ python -m lulamacaroni.checks.resolution obra.jpg 8x10 12x16 18x24
 | M7 Workbook | Schema and setup script ready; needs the Google Cloud service account and the sheet ([setup](docs/setup/google-cloud.md)) |
 | M9 Resolution check | Ready; DPI thresholds to confirm with Prodigi samples |
 | M10 Connectors | Shopify ready (needs the app credentials in the cloud environment); Prodigi ready (needs sandbox key); Etsy, QuickBooks next |
-| M12 Approval gate | Gate, store and local page ready; hosting behind Cloudflare Access next |
+| M11 Dashboard | First read-only slice: Inicio (today, 7, 30 days vs prior period, 3 actions), Pedidos, Catálogo, Fuentes. Every number carries source, period, definition, last update and real / missing / estimated |
+| M12 Approval gate | Gate, store and page ready, also inside the app as Aprobar; hosting behind Cloudflare Access next |

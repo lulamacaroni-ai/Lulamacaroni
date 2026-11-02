@@ -37,6 +37,21 @@ class Workbook:
     def from_env(cls) -> "Workbook":
         return cls(google_client().open_by_key(config.require("LULA_WORKBOOK_ID")))
 
+    def read(self, nombre_tab: str) -> list[dict]:
+        """All rows of a tab as dicts keyed by the schema's columns (empty cells are "")."""
+        t = tab(nombre_tab)
+        values = self.book.worksheet(nombre_tab).get_all_values()
+        if not values:
+            return []
+        header = values[0]
+        out = []
+        for r in values[1:]:
+            r = list(r) + [""] * (len(header) - len(r))
+            row = {col: r[i] for i, col in enumerate(header) if col in t.columnas}
+            if row.get(t.clave):
+                out.append(row)
+        return out
+
     def upsert(self, nombre_tab: str, rows: list[dict]) -> dict[str, int]:
         """Insert new rows and update existing ones by the tab's key column.
 

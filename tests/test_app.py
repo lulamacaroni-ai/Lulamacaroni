@@ -1,0 +1,154 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from lulamacaroni.app import metrics as m
+from lulamacaroni.app.demo import demo_rows, fill_demo
+from lulamacaroni.app.screens import Datos, render
+from lulamacaroni.approval import JsonStore, request_approval
+from lulamacaroni.localbook import LocalWorkbook
+
+NOW = datetime(2026, 11, 2, 20, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def book(tmp_path):
+    b = LocalWorkbook(tmp_path / "libro")
+    fill_demo(b, NOW)
+    return b
+
+
+@pytest.fixture
+def store(tmp_path):
+    return JsonStore(tmp_path / "aprobaciones.json")
+
+
+def _dato(res, label):
+    return next(d for d in res.datos if d.etiqueta == label)
+
+
+# --- local workbook ----------------------------------------------------------------
+
+def test_local_workbook_upsert_keeps_other_columns(tmp_path):
+    b = LocalWorkbook(tmp_path)
+    row = {"listado_ref": "shopify-1", "sku": "A", "linea": "US-POD", "canal": "shopify",
+           "precio": 95}
+    assert b.upsert("Listados", [row]) == {"actualizadas": 0, "nuevas": 1}
+    assert b.upsert("Listados", [{"listado_ref": "shopify-1", "linea": "US-POD",
+                                  "precio": 99}]) == {"actualizadas": 1, "nuevas": 0}
+    [saved] = b.read("Listados")
+    assert saved["sku"] == "A" and saved["precio"] == 99
+
+
+def test_local_workbook_refuses_invalid_rows(tmp_path):
+    with pytest.raises(ValueError):
+        LocalWorkbook(tmp_path).upsert("Pedidos", [{"linea_pedido_id": "x", "estado": "raro",
+                                                    "linea": "US-POD"}])
+    assert LocalWorkbook(tmp_path).read("Pedidos") == []
+
+
+# --- sources -----------------------------------------------------------------------
+
+def test_sources_not_stamped_are_unconnected_and_old_ones_late():
+    rows = [{"fuente": "shopify", "ultima_actualizacion": (NOW - timedelta(hours=30)).isoformat(),
+             "estado": "ok"}]
+    f = m.estado_fuentes(rows, NOW)
+    assert f["shopify"].estado == "atrasada" and f["shopify"].conectada
+    assert f["etsy"].estado == "sin-conectar" and not f["etsy"].conectada
+
+
+# --- metrics: zero vs missing ---------------------------------------------------------
+
+def test_nothing_connected_means_missing_never_zero():
+    res = m.resumen([], [], m.estado_fuentes([], NOW), m.periodo("7", NOW))
+    for d in res.datos:
+        assert d.calidad == "faltante" and d.valor is None
+
+
+def test_connected_with_no_orders_is_a_real_zero():
+    f = m.estado_fuentes([{"fuente": "shopify", "ultima_actualizacion": NOW.isoformat(),
+                           "estado": "ok"}], NOW)
+    res = m.resumen([], [], f, m.periodo("hoy", NOW))
+    pedidos = _dato(res, "Pedidos")
+    assert pedidos.valor == 0 and pedidos.es_cero
+    assert "Etsy" in pedidos.nota  # partial: says which channel is missing
+    assert _dato(res, "Margen de contribución").calidad == "faltante"
+    assert _dato(res, "Gasto publicitario").calidad == "faltante"
+
+
+def test_net_sales_period_and_comparison():
+    rows = demo_rows(NOW)
+    f = m.estado_fuentes(rows["Fuentes"], NOW)
+    res = m.resumen(rows["Pedidos"], [], f, m.periodo("7", NOW))
+    ventas = _dato(res, "Ventas netas")
+    # last 7 days: 100 + 80 + 120 + 80; previous 7: 100 (delivered) + (100 − 100 refunded)
+    assert ventas.valor == 380.0 and ventas.previo == 100.0
+    assert round(ventas.cambio_pct) == 280
+    assert _dato(res, "Pedidos").valor == 4
+    assert ventas.fuente == "Shopify" and ventas.periodo.endswith("hora de CDMX")
+
+
+def test_cancelled_orders_are_not_sales():
+    rows = [{"pedido_id": "shopify-1", "fecha": NOW.isoformat(), "venta_bruta": "50",
+             "estado": "cancelado", "linea": "US-POD"}]
+    f = m.estado_fuentes([{"fuente": "shopify", "ultima_actualizacion": NOW.isoformat()}], NOW)
+    res = m.resumen(rows, [], f, m.periodo("hoy", NOW + timedelta(minutes=1)))
+    assert _dato(res, "Pedidos").valor == 0
+
+
+def test_today_uses_mexico_city_midnight():
+    # 05:30 UTC on Nov 2 is still Nov 1 in CDMX (UTC−6)
+    per = m.periodo("hoy", datetime(2026, 11, 2, 5, 30, tzinfo=timezone.utc))
+    assert per.inicio.astimezone(timezone.utc) == datetime(2026, 11, 1, 6, 0, tzinfo=timezone.utc)
+
+
+# --- orders and catalog ------------------------------------------------------------------
+
+def test_orders_without_a_printer_need_attention():
+    pedidos = m.agrupar_pedidos(demo_rows(NOW)["Pedidos"])
+    atencion = [p for p in pedidos if p.grupo == "atencion"]
+    assert [p.numero for p in atencion] == ["1003"]
+    assert {p.numero for p in pedidos if p.grupo == "cerrado"} == {"1005", "1006"}
+
+
+def test_catalog_groups_variants_and_flags_missing_skus():
+    productos = m.agrupar_catalogo(demo_rows(NOW)["Listados"])
+    assert len(productos) == 3
+    owl = next(p for p in productos if p.titulo == "Sample Owl")
+    assert owl.variantes == 3 and owl.sin_sku == 3 and owl.avisos
+    assert owl.precio_min == 80 and owl.precio_max == 120
+
+
+def test_three_actions_in_priority_order(book, store):
+    request_approval(store, tipo="precio", linea="US-POD", resumen="x", contenido={"a": 1},
+                     creado_por="test")
+    d = Datos(book, store, NOW)
+    acciones = m.acciones_del_dia(d.pendientes, d.pedidos, d.productos, d.fuentes, d.excepciones)
+    assert len(acciones) == 3
+    assert acciones[0].enlace == "/aprobar"
+    assert "#1003" in acciones[1].texto
+
+
+# --- screens -----------------------------------------------------------------------------
+
+@pytest.mark.parametrize("path,needle", [
+    ("/", "Hola, Lore"), ("/pedidos", "Necesitan atención"), ("/catalogo", "Catálogo"),
+    ("/fuentes", "sin conectar"), ("/aprobar", "Aprobaciones"),
+])
+def test_every_screen_renders(book, store, path, needle):
+    html = render(path, {}, Datos(book, store, NOW), banner="Datos de ejemplo")
+    assert needle in html and "Datos de ejemplo" in html
+
+
+def test_missing_numbers_show_a_dash_not_zero(book, store):
+    html = render("/", {"p": "30"}, Datos(book, store, NOW))
+    assert "falta el dato" in html and "¿De dónde sale?" in html
+    assert render("/nope", {}, Datos(book, store, NOW)) is None
+
+
+def test_screens_escape_store_text(tmp_path, store):
+    b = LocalWorkbook(tmp_path)
+    b.upsert("Listados", [{"listado_ref": "shopify-1", "linea": "US-POD", "canal": "shopify",
+                           "titulo_en_canal": "<script>x</script>", "estado": "publicado"}])
+    html = render("/catalogo", {}, Datos(b, store, NOW))
+    assert "<script>x" not in html and "&lt;script&gt;" in html
