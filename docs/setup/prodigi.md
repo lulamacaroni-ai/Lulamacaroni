@@ -25,9 +25,25 @@ PRODIGI_ENV=live python -m lulamacaroni.connectors.prodigi --check   # live, rea
 
 It prints whether the key works, how many orders there are by stage, and the references of the first three. It prints no recipient data.
 
-## Next slice: costs and margin
+## Status (2026-11-02)
 
-1. **Read Prodigi orders and match them to `Pedidos`.** Use `merchantReference` or the sales-channel id that Prodigi's Shopify app stores. Fill in `pod_pedido_id`, `costo_pod`, `envio_pod` and tracking. The first live `--check` confirms which field carries the Shopify order.
-2. **Read Shopify Payments fees** (balance transactions) into `comision_canal`. Read payouts into `Pagos`. This also fills "Por recibir".
-3. **Compute `margen_contribucion` per line** once every cost is known. Mark the line `calidad_dato = real`. Until then, use `estimado` (from a Prodigi quote) or `faltante`. A missing cost is never treated as zero.
-4. **Inicio and Pedidos** then show margin per order, artwork and channel, with real against estimated cost.
+Both keys work: sandbox and live each answered "key OK, 0 orders". The network block is gone.
+
+## Costs into Pedidos
+
+```bash
+PRODIGI_ENV=live python -m lulamacaroni.connectors.prodigi --sync
+```
+
+Reads Prodigi only. Run it after the Shopify sync. For each Prodigi order it finds the Shopify order and writes **only** `pod_pedido_id`, `costo_pod` and `envio_pod` on that order's Pedidos lines, then calls `margen.recalcular(wb)` for margin and `calidad_dato`. It stamps `Fuentes` as `prodigi` (live) or `prodigi-sandbox`, so a sandbox run never looks like live data.
+
+- **Matching.** Which Prodigi field carries the Shopify order is not confirmed yet, because there were no orders. The sync tries `merchantReference`, `idempotencyKey` and every `metadata` value, against the Shopify order name in `numero_canal` ("#1005") and the Shopify id in `pedido_id`. A Prodigi order that matches nothing is counted in the `Fuentes` note and listed by `--sync` (Prodigi id and references only), never guessed. After the first real order, run `--check`: it prints the reference and metadata keys, which settles the field.
+- **Real costs only.** Costs come from the order's Prodigi `charges`. Charge lines with an item id are print cost; lines without one are shipping. An order Prodigi has not charged yet gets only `pod_pedido_id`, and its cost stays empty (missing, never zero).
+- **Placing cost on lines.** Item cost goes to the Shopify line whose SKU matches the Prodigi item's `merchantReference` or SKU. If any item can't be placed, the whole item cost goes on the first Prodigi line and 0 on the others, so the order's margin is right. Shipping always goes on the first Prodigi line. Frame It Easy lines are never touched.
+- Cancelled Prodigi orders are skipped.
+
+## Still to do
+
+- Confirm the matching field on the first real order.
+- Shopify Payments fees into `comision_canal` and payouts into `Pagos` (other slice; payouts need `read_shopify_payments_payouts` and `read_shopify_payments_accounts`).
+- Tracking stays from Shopify fulfillments, which the Prodigi app fills.

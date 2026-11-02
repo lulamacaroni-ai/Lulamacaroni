@@ -93,3 +93,78 @@ def test_sandbox_never_falls_back_to_the_live_key(monkeypatch):
     monkeypatch.setenv("PRODIGI_ENV", "sandbox")
     with _pytest.raises(MissingSetting):
         ProdigiClient.from_env()
+
+
+# --- costs into Pedidos -----------------------------------------------------------
+
+from lulamacaroni.connectors.prodigi import charges, match_orders, order_refs, sync  # noqa: E402
+from lulamacaroni.localbook import LocalWorkbook  # noqa: E402
+
+
+def pedido(line, sku, ruta="prodigi-app", order="shopify-555", **extra):
+    return {"linea_pedido_id": f"{order}-{line}", "pedido_id": order, "linea": "US-POD",
+            "canal": "shopify", "sku": sku, "ruta_pod": ruta, **extra}
+
+
+def prodigi_order(ref="#1005", charged=True, items=(("ori_1", "GLOBAL-FAP-16X20", "A-16"),)):
+    o = {"id": "ord_9", "merchantReference": ref, "status": {"stage": "Complete"},
+         "items": [{"id": i, "sku": sku, "merchantReference": mref} for i, sku, mref in items],
+         "charges": []}
+    if charged:
+        lines = [{"itemId": i, "cost": {"amount": "20.50", "currency": "USD"}} for i, *_ in items]
+        lines.append({"itemId": None, "cost": {"amount": "7.00", "currency": "USD"}})
+        o["charges"] = [{"id": "chg_1", "items": lines}]
+    return o
+
+
+def test_order_refs_tries_every_likely_field():
+    o = {"merchantReference": "#1005", "idempotencyKey": "gid://shopify/Order/555",
+         "metadata": {"shopifyOrderId": 555}}
+    assert set(order_refs(o)) >= {"1005", "555"}
+
+
+def test_uncharged_order_is_missing_not_zero():
+    assert charges(prodigi_order(charged=False)) is None
+    rows, _ = match_orders([prodigi_order(charged=False)],
+                           [pedido("1", "A-16", numero_canal="#1005")])
+    assert rows == [{"linea_pedido_id": "shopify-555-1", "linea": "US-POD", "pod_pedido_id": "ord_9"}]
+
+
+def test_matches_by_order_name_and_places_cost_by_sku():
+    items = (("ori_1", "P-1", "A-16"), ("ori_2", "P-2", "B-8"))
+    lines = [pedido("1", "A-16", numero_canal="#1005"), pedido("2", "B-8", numero_canal="#1005"),
+             pedido("3", "FIE-1", ruta="frame-it-easy-app", numero_canal="#1005")]
+    rows, unmatched = match_orders([prodigi_order(items=items)], lines)
+    assert not unmatched
+    by_id = {r["linea_pedido_id"]: r for r in rows}
+    assert set(by_id) == {"shopify-555-1", "shopify-555-2"}  # Frame It Easy line untouched
+    assert by_id["shopify-555-1"]["costo_pod"] == 20.5 and by_id["shopify-555-2"]["costo_pod"] == 20.5
+    assert by_id["shopify-555-1"]["envio_pod"] == 7.0 and by_id["shopify-555-2"]["envio_pod"] == 0.0
+
+
+def test_matches_by_legacy_id_and_falls_back_to_first_line():
+    items = (("ori_1", "P-1", "?"), ("ori_2", "P-2", "?"))
+    lines = [pedido("1", "A-16"), pedido("2", "B-8")]
+    rows, _ = match_orders([prodigi_order(ref="555", items=items)], lines)
+    assert [r["costo_pod"] for r in rows] == [41.0, 0.0]
+
+
+def test_unmatched_and_cancelled_orders():
+    cancelled = {**prodigi_order(ref="#1005"), "status": {"stage": "Cancelled"}}
+    rows, unmatched = match_orders([prodigi_order(ref="#9999"), cancelled],
+                                   [pedido("1", "A-16", numero_canal="#1005")])
+    assert rows == [] and [o["merchantReference"] for o in unmatched] == ["#9999"]
+
+
+def test_sync_writes_only_prodigi_columns(tmp_path, monkeypatch):
+    wb = LocalWorkbook(tmp_path)
+    full = {**pedido("1", "A-16"), "venta_bruta": 100.0, "producto": "Lámina"}
+    wb.upsert("Pedidos", [full])
+    c = client(FakeResponse(200, {"orders": [prodigi_order(ref="555")], "hasMore": False}))
+    c.env = "live"
+    result = sync(c, wb)
+    row = wb.read("Pedidos")[0]
+    assert result["lineas"] == 1
+    assert (row["costo_pod"], row["envio_pod"], row["pod_pedido_id"]) == (20.5, 7.0, "ord_9")
+    assert row["venta_bruta"] == 100.0 and row["producto"] == "Lámina"
+    assert {f["fuente"] for f in wb.read("Fuentes")} == {"prodigi"}
