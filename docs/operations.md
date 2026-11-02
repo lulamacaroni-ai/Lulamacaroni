@@ -31,12 +31,13 @@ Optional, with safe defaults:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `PRODIGI_ENV` | `sandbox` | A sandbox run never falls back to the live key |
+| `PRODIGI_ENV` | `sandbox` | **Set it to `live` in the cloud environment for real Prodigi costs.** Unset means sandbox, which writes `prodigi-sandbox` in Fuentes and never falls back to the live key |
 | `LULA_WORKBOOK_NAME` | `LulaMacaroni Operaciones` | The sheet is found by name among files shared with the service account |
 | `LULA_WORKBOOK_ID` | empty | Pin the sheet only if two shared sheets have the same name |
 | `LULA_LIBRO` | auto | `google` or `local`; auto = Google when a key is set |
 | `LULA_TZ` | `America/Mexico_City` | "Hoy" and all periods use this zone |
 | `SHOPIFY_API_VERSION` | `2025-10` | |
+| `LULA_INVESTIGACION_CARPETA_ID` | empty | Pin the research Drive folder; otherwise it is found by the name "LulaMacaroni Investigación" |
 
 Not set yet (sources not connected): Etsy (`ETSY_*`), QuickBooks (`QBO_*`), Meta (`META_*`, `INSTAGRAM_BUSINESS_ID`), Pinterest (`PINTEREST_ACCESS_TOKEN`), `ANTHROPIC_API_KEY` for scheduled agents, `LULA_DRIVE_FOLDER_ID`.
 
@@ -66,15 +67,19 @@ When Etsy, QuickBooks, Meta or Pinterest get connected, add their API hosts here
 ```bash
 pip install -e ".[google,dev]"
 pytest                                                   # offline, no keys
+python -m lulamacaroni.sync                              # THE daily command (PR #12): Shopify, then Prodigi, then today's alerts
 python -m lulamacaroni.connectors.shopify --dry-run      # counts, writes nothing
-python -m lulamacaroni.connectors.shopify                # Listados, Pedidos, Clientes, fees, payouts → sheet
-PRODIGI_ENV=live python -m lulamacaroni.connectors.prodigi --sync   # real costs into Pedidos (read-only on Prodigi)
+python -m lulamacaroni.connectors.shopify                # Shopify alone: Listados, Pedidos, Clientes, fees, payouts
+python -m lulamacaroni.connectors.prodigi --sync         # Prodigi alone: real costs into Pedidos (read-only on Prodigi)
+python -m lulamacaroni.connectors.investigacion          # monthly: new eRank/EverBee CSVs from the Drive folder (PR #10)
 python -m lulamacaroni.app.alertas                       # Resumen del día + alerts as text
 python -m lulamacaroni.app.server                        # the app on real data, http://127.0.0.1:8770
 python -m lulamacaroni.app.server --demo                 # sample data, clearly marked
 ```
 
-Order matters: Shopify first, then Prodigi (Prodigi costs attach to Shopify orders). Every sync stamps `Fuentes`, which drives "al día / atrasada / con error / sin conectar". Nothing is scheduled yet; the syncs run when a session runs them.
+`sync` runs Shopify first, then Prodigi (Prodigi costs attach to Shopify orders). Each source is independent: if one fails, the others still run and the failed one is marked `error` in `Fuentes`, keeping its last good update time, so the app says the sync failed instead of showing old numbers as current. Prodigi uses `PRODIGI_ENV`, so real costs need `PRODIGI_ENV=live` in the environment. Nothing is scheduled yet; the syncs run when a session runs them.
+
+Research (PR #10): share a Drive folder named **LulaMacaroni Investigación** with the service account as Viewer. Drive calls go through `www.googleapis.com`, which is already allowed. Lorena drops the monthly eRank/EverBee CSVs there ([setup/investigacion-es.md](setup/investigacion-es.md)).
 
 Writes to the outside world all go through the approval gate (`assert_approved()` with the exact content, then `mark_executed()`). Today the only external write in code is `create_draft_product` in Shopify (a draft, with an approved `listado`) and a Prodigi manual order (with an approved `pedido-manual`). See [approval-gate.md](approval-gate.md).
 
@@ -88,7 +93,7 @@ Writes to the outside world all go through the approval gate (`assert_approved()
 
 ## 7. The stacked PRs
 
-All drafts in `lulamacaroni-ai/Lulamacaroni`, none merged yet. Each is based on the one before it, so merge in order from the bottom (#1 first) or review the top of the stack to see everything.
+All drafts in `lulamacaroni-ai/Lulamacaroni`, none merged yet. Through #9 each is based on the one before it, so merge in order from the bottom (#1 first). #10, #11 and #12 all sit on #9 independently.
 
 | PR | Branch | What |
 |---|---|---|
@@ -101,9 +106,11 @@ All drafts in `lulamacaroni-ai/Lulamacaroni`, none merged yet. Each is based on 
 | #7 | `claude/project-thread-yqb3bh` → #6 | Catálogo product pages and Contenido |
 | #8 | `claude/project-thread-52o9j9` → #7 | Publicidad: campaigns, Topes, attribution |
 | #9 | `claude/project-thread-avr357` → #8 | Clientes |
-| this PR | `claude/project-thread-95gzdm` → #9 | Runbook (ES) and this guide; docs only |
+| #10 | `claude/project-thread-9e5fls` → #9 | Investigación: eRank/EverBee CSV importer from Drive, trends, competitor prices, keyword ideas |
+| #11 | `claude/project-thread-95gzdm` → #9 | Runbook (ES) and this guide; docs only |
+| #12 | `claude/project-thread-o6002v` → #9 | `python -m lulamacaroni.sync`: one daily sync, failed sources marked `error` |
 
-In progress in parallel: Investigación (eRank/EverBee CSV import) on top of #9, then the Mexico catalog site. Later: Etsy (once the account exists), QuickBooks, Finanzas view.
+Next: the Mexico catalog site and the Finanzas view (in progress). Later: Etsy (once the account exists), QuickBooks.
 
 ## 8. Handover
 
