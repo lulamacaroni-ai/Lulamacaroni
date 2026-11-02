@@ -68,7 +68,10 @@ One row per: Un SKU publicado en un canal. Key: `listado_ref`.
 | `linea` | US-POD, MX-original |
 | `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `id_en_canal` |  |
+| `titulo_en_canal` |  |
 | `url` |  |
+| `precio` |  |
+| `inventario` |  |
 | `estado` | borrador, en-aprobacion, publicado, pausado, retirado |
 | `aprobacion_id` |  |
 | `ultima_sync` |  |
@@ -96,6 +99,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `envio_pod` |  |
 | `reembolso` |  |
 | `margen_contribucion` |  |
+| `ruta_pod` | prodigi-app, frame-it-easy-app, prodigi-api, manual, desconocida |
 | `pod_pedido_id` |  |
 | `tracking` |  |
 | `estado` | recibido, enviado-a-pod, en-produccion, enviado, entregado, cancelado, reembolsado, excepcion |

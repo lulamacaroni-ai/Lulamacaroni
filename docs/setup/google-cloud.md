@@ -13,8 +13,8 @@ About 15 minutes. Do it signed in as the **business Google account**, not a pers
 1. Open **IAM & Admin → Service Accounts → Create service account**.
 2. Name it `lulamacaroni-bot`. Skip the optional roles; it needs none at project level.
 3. Open the new account, go to **Keys → Add key → Create new key → JSON**, and download it.
-4. Move the JSON file **outside the repo**, for example `~/.config/lulamacaroni/service-account.json`.
-5. In `.env`, set `GOOGLE_APPLICATION_CREDENTIALS` to that path.
+4. In the Claude cloud environment (Project settings → Cloud environment), add a variable `GOOGLE_SERVICE_ACCOUNT_JSON` whose value is the **whole text** of that JSON file. Then delete the downloaded file. (On a local machine instead: keep the file outside the repo and set `GOOGLE_APPLICATION_CREDENTIALS` to its path in `.env`.)
+5. Allow `*.googleapis.com` in the environment's network access.
 6. Copy the service account's email address, which looks like `lulamacaroni-bot@lulamacaroni-ops.iam.gserviceaccount.com`.
 
 ## 3. Workbook and Drive folder
@@ -22,7 +22,7 @@ About 15 minutes. Do it signed in as the **business Google account**, not a pers
 1. In Google Drive (business account), create a folder named `LulaMacaroni` with these subfolders: `masters`, `impresion`, `web`, `mockups`, `investigacion`.
 2. In that folder, create an empty Google Sheet named **LulaMacaroni Operaciones**.
 3. Share the folder with the service account email as **Editor**. The sheet inherits access from the folder.
-4. Put the sheet's ID in `.env` as `LULA_WORKBOOK_ID`. The ID is the long string in its URL between `/d/` and `/edit`. Put the folder's ID in `LULA_DRIVE_FOLDER_ID`.
+4. Add the sheet's ID to the cloud environment as `LULA_WORKBOOK_ID`. The ID is the long string in its URL between `/d/` and `/edit`. Add the folder's ID as `LULA_DRIVE_FOLDER_ID`.
 
 ## 4. Create the tabs
 

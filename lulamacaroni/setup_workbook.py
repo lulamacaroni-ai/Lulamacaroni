@@ -73,12 +73,9 @@ def plan(existing_tabs: set[str]) -> list[str]:
 
 
 def apply() -> None:
-    import gspread  # optional dependency: pip install .[google]
+    from .workbook import google_client
 
-    workbook_id = config.require("LULA_WORKBOOK_ID")
-    creds_path = config.require("GOOGLE_APPLICATION_CREDENTIALS")
-    gc = gspread.service_account(filename=creds_path)
-    book = gc.open_by_key(workbook_id)
+    book = google_client().open_by_key(config.require("LULA_WORKBOOK_ID"))
     existing = {ws.title: ws for ws in book.worksheets()}
 
     for line in plan(set(existing)):

@@ -19,7 +19,7 @@ Jon builds everything, and then Lorena runs it from her own Claude account. Thes
 - [ ] Change every password used during the build (password manager).
 - [ ] Regenerate the keys:
   - [ ] Prodigi API keys
-  - [ ] Shopify custom app token
+  - [ ] Shopify app client secret (Dev Dashboard → LulaMacaroni Operaciones → rotate)
   - [ ] Etsy app secret and refresh token
   - [ ] Google service-account key
   - [ ] QuickBooks app secret

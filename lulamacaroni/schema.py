@@ -53,6 +53,10 @@ TIPOS_APROBACION = (
 ESTADOS_APROBACION = ("pendiente", "aprobado", "rechazado", "expirado", "cancelado")
 ESTADOS_EXCEPCION = ("abierta", "en-curso", "resuelta")
 
+# Who fulfils an order line. Orders the Prodigi (or Frame It Easy) app already routes
+# must never also be sent through the Prodigi API, or the print is made twice.
+RUTAS_POD = ("prodigi-app", "frame-it-easy-app", "prodigi-api", "manual", "desconocida")
+
 CALIDAD_DATO = ("real", "estimado", "faltante")
 
 ORIENTACIONES = ("vertical", "horizontal", "cuadrada")
@@ -114,8 +118,8 @@ TABS: tuple[Tab, ...] = (
         fila="Un SKU publicado en un canal",
         clave="listado_ref",
         columnas=(
-            "listado_ref", "sku", "linea", "canal", "id_en_canal", "url", "estado",
-            "aprobacion_id", "ultima_sync",
+            "listado_ref", "sku", "linea", "canal", "id_en_canal", "titulo_en_canal", "url",
+            "precio", "inventario", "estado", "aprobacion_id", "ultima_sync",
         ),
         validaciones={"linea": LINEAS, "canal": CANALES, "estado": ESTADOS_LISTADO},
     ),
@@ -127,10 +131,10 @@ TABS: tuple[Tab, ...] = (
             "linea_pedido_id", "pedido_id", "linea", "canal", "fecha", "sku", "cantidad",
             "moneda", "venta_bruta", "descuento", "impuesto_cobrado", "envio_cobrado",
             "comision_canal", "costo_pod", "envio_pod", "reembolso", "margen_contribucion",
-            "pod_pedido_id", "tracking", "estado", "calidad_dato",
+            "ruta_pod", "pod_pedido_id", "tracking", "estado", "calidad_dato",
         ),
         validaciones={
-            "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO,
+            "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,
             "calidad_dato": CALIDAD_DATO,
         },
     ),

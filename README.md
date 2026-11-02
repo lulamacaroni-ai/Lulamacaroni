@@ -20,6 +20,8 @@ lulamacaroni/
   schema_doc.py        Regenerates docs/data-layer.md from the schema
   config.py            Reads settings from .env (never from code)
   approval/            Approval gate, store, and the Spanish approval page
+  workbook.py          Upsert rows into the workbook by key; stamps Fuentes
+  connectors/shopify.py  Shopify Admin GraphQL (client-credentials app): listings, orders, POD routing
   connectors/prodigi.py  Prodigi Print API v4 (orders, tracking, quotes, products)
   checks/resolution.py   Print-file resolution/proportion check, never crops or stretches
   checks/guards.py       Discontinued-POD and sold-original guards
@@ -28,6 +30,7 @@ docs/
   data-layer.md        Every tab and column (generated)
   approval-gate.md     The approval rules and how hosting works
   setup/google-cloud.md  Step by step: service account + workbook
+  setup/shopify.md     Where the Shopify app's credentials go
   runbook-es.md        Lorena's runbook in Spanish (stub, grows with the build)
   handover.md          What Lorena receives and what she rotates
 tests/                 pytest suite (no network, no secrets)
@@ -38,7 +41,7 @@ tests/                 pytest suite (no network, no secrets)
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[google,dev]"
-cp .env.example .env          # fill in locally; never commit it
+cp .env.example .env          # local only; in the Claude cloud environment use its environment variables
 pytest                        # everything runs offline
 
 python -m lulamacaroni.setup_workbook --dry-run         # what the workbook will look like
@@ -62,5 +65,5 @@ python -m lulamacaroni.checks.resolution obra.jpg 8x10 12x16 18x24
 | M6 Repo foundation | This PR |
 | M7 Workbook | Schema and setup script ready; needs the Google Cloud service account and the sheet ([setup](docs/setup/google-cloud.md)) |
 | M9 Resolution check | Ready; DPI thresholds to confirm with Prodigi samples |
-| M10 Connectors | Prodigi client ready (needs sandbox key to run live); Shopify, Etsy, QuickBooks next, once access exists |
+| M10 Connectors | Shopify ready (needs the app credentials in the cloud environment); Prodigi ready (needs sandbox key); Etsy, QuickBooks next |
 | M12 Approval gate | Gate, store and local page ready; hosting behind Cloudflare Access next |
