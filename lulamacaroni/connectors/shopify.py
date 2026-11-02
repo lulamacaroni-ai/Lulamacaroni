@@ -22,6 +22,11 @@ What it does
   manual orders.
 * Writes only drafts, and only with an approved record from the approval gate.
 
+Fulfilment orders need the ``read_merchant_managed_fulfillment_orders`` and
+``read_third_party_fulfillment_orders`` scopes. Without them the orders query falls back
+to routing each line by its variant's stock location, matched against the store's
+fulfilment services (Manual, FIE Fulfillment, Prodigi), which current scopes can read.
+
 Scope notes: the app has read orders but not ``read_all_orders``, so Shopify returns
 only the last 60 days of orders. That is fine for a daily sync; history beyond it needs
 the extra scope (Shopify approval) or a one-time CSV export.
@@ -54,6 +59,8 @@ ROUTES = (
     ("prodigi", "prodigi-app"),
     ("frame it easy", "frame-it-easy-app"),
     ("frameiteasy", "frame-it-easy-app"),
+    ("fie fulfillment", "frame-it-easy-app"),   # the app's fulfilment-service name in the store
+    ("fie-fulfillment", "frame-it-easy-app"),
 )
 
 
@@ -148,9 +155,10 @@ class ShopifyClient:
     def paginate(self, query: str, path: str, variables: dict | None = None,
                  page_size: int = 50) -> Iterator[dict]:
         """Yield every node of the connection at ``path`` (e.g. ``"products"``)."""
-        cursor = None
+        variables = dict(variables or {})
+        cursor = variables.pop("after", None)
         while True:
-            data = self.graphql(query, {**(variables or {}), "first": page_size, "after": cursor})
+            data = self.graphql(query, {**variables, "first": page_size, "after": cursor})
             conn = data[path]
             yield from conn["nodes"]
             if not conn["pageInfo"]["hasNextPage"]:
@@ -161,9 +169,29 @@ class ShopifyClient:
     def iter_products(self) -> Iterator[dict]:
         return self.paginate(PRODUCTS_QUERY, "products")
 
+    def location_routes(self) -> dict[str, str]:
+        """Location id -> ruta_pod, from the store's fulfilment services."""
+        data = self.graphql(FULFILLMENT_SERVICES_QUERY)
+        return {fs["location"]["id"]: route_for(fs["serviceName"])
+                for fs in data["shop"]["fulfillmentServices"] if fs.get("location")}
+
     def iter_orders(self, since: datetime | None = None) -> Iterator[dict]:
         query = f"updated_at:>='{since.isoformat()}'" if since else None
-        return self.paginate(ORDERS_QUERY, "orders", {"query": query}, page_size=25)
+        variables = {"query": query}
+        try:
+            first = self.graphql(ORDERS_QUERY, {**variables, "first": 25, "after": None})
+        except ShopifyError as e:
+            if not _denied_field(e, "fulfillmentOrders"):
+                raise
+            # Missing fulfilment-order scopes: route by variant stock location instead.
+            yield from self.paginate(ORDERS_QUERY_BY_VARIANT, "orders", variables, page_size=25)
+            return
+        conn = first["orders"]
+        yield from conn["nodes"]
+        if conn["pageInfo"]["hasNextPage"]:
+            yield from self.paginate(ORDERS_QUERY, "orders",
+                                     {**variables, "after": conn["pageInfo"]["endCursor"]},
+                                     page_size=25)
 
     # -- writes (gated) ----------------------------------------------------------
     def create_draft_product(self, product: dict, *, approval) -> dict:
@@ -177,6 +205,12 @@ class ShopifyClient:
         if result["userErrors"]:
             raise ShopifyError(f"productCreate: {result['userErrors']}", result)
         return result["product"]
+
+
+def _denied_field(error: ShopifyError, field_name: str) -> bool:
+    errors = (error.payload or {}).get("errors") if isinstance(error.payload, dict) else None
+    return any((e.get("extensions") or {}).get("code") == "ACCESS_DENIED"
+               and field_name in (e.get("path") or []) for e in errors or [])
 
 
 def _throttled(resp) -> bool:
@@ -237,6 +271,23 @@ query Orders($first: Int!, $after: String, $query: String) {
 }
 """
 
+# Same as ORDERS_QUERY minus fulfillmentOrders, plus each line's variant stock location.
+ORDERS_QUERY_BY_VARIANT = ORDERS_QUERY.replace("""
+      fulfillmentOrders(first: 10) {
+        nodes {
+          status
+          assignedLocation { name }
+          lineItems(first: 50) { nodes { lineItem { id } } }
+        }
+      }""", "").replace("""
+          taxLines { priceSet { shopMoney { amount } } }""", """
+          taxLines { priceSet { shopMoney { amount } } }
+          variant { inventoryItem { inventoryLevels(first: 5) { nodes { location { id } } } } }""")
+
+FULFILLMENT_SERVICES_QUERY = """
+{ shop { fulfillmentServices { serviceName location { id } } } }
+"""
+
 PRODUCT_CREATE = """
 mutation ProductCreate($product: ProductCreateInput!) {
   productCreate(product: $product) {
@@ -248,7 +299,9 @@ mutation ProductCreate($product: ProductCreateInput!) {
 
 # --- mapping to workbook rows (pure, tested offline) ---------------------------
 
-LISTING_STATUS = {"ACTIVE": "publicado", "DRAFT": "borrador", "ARCHIVED": "retirado"}
+# UNLISTED (API 2025-10+): live but hidden from the storefront and search.
+LISTING_STATUS = {"ACTIVE": "publicado", "UNLISTED": "pausado", "DRAFT": "borrador",
+                  "ARCHIVED": "retirado"}
 
 
 def _money(node: dict | None) -> float:
@@ -299,7 +352,14 @@ def _order_state(order: dict) -> str:
     return "recibido"
 
 
-def order_to_rows(order: dict) -> list[dict]:
+def _variant_route(line: dict, location_routes: dict[str, str]) -> str:
+    levels = ((((line.get("variant") or {}).get("inventoryItem") or {})
+               .get("inventoryLevels") or {}).get("nodes") or [])
+    routes = {location_routes.get(n["location"]["id"], "manual") for n in levels}
+    return routes.pop() if len(routes) == 1 else "desconocida"
+
+
+def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) -> list[dict]:
     """One ``Pedidos`` row per line item.
 
     Sale amounts are real. Channel fees (Shopify Payments) and Prodigi cost are not in
@@ -309,7 +369,7 @@ def order_to_rows(order: dict) -> list[dict]:
     if order.get("test"):
         return []
     route_by_line: dict[str, str] = {}
-    for fo in order["fulfillmentOrders"]["nodes"]:
+    for fo in (order.get("fulfillmentOrders") or {}).get("nodes") or []:
         route = route_for((fo.get("assignedLocation") or {}).get("name"))
         for li in fo["lineItems"]["nodes"]:
             route_by_line[li["lineItem"]["id"]] = route
@@ -345,7 +405,9 @@ def order_to_rows(order: dict) -> list[dict]:
             "costo_pod": "",
             "envio_pod": "",
             "margen_contribucion": "",
-            "ruta_pod": route_by_line.get(li["id"], "desconocida"),
+            "ruta_pod": route_by_line.get(li["id"])
+            or (_variant_route(li, location_routes) if location_routes is not None
+                else "desconocida"),
             "tracking": ", ".join(dict.fromkeys(tracking_by_line.get(li["id"], []))),
             "estado": estado,
             "calidad_dato": "faltante",
@@ -359,7 +421,8 @@ def sync(client: ShopifyClient, since_days: int = 60) -> tuple[list[dict], list[
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     listings = [r for p in client.iter_products() for r in product_to_listing_rows(p, now)]
     since = datetime.now(timezone.utc) - timedelta(days=since_days)
-    orders = [r for o in client.iter_orders(since) for r in order_to_rows(o)]
+    routes = client.location_routes()
+    orders = [r for o in client.iter_orders(since) for r in order_to_rows(o, routes)]
     return listings, orders
 
 

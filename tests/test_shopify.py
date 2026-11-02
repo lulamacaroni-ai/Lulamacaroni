@@ -189,3 +189,47 @@ def test_create_draft_requires_approval(tmp_path):
     assert c.create_draft_product(product, approval=rec)["status"] == "DRAFT"
     sent = c.session.calls[-1][1]["json"]["variables"]["product"]
     assert sent["status"] == "DRAFT"
+
+
+def test_route_for_fie_fulfillment_service_name():
+    # Frame It Easy registers itself in the store as "FIE Fulfillment".
+    assert route_for("FIE Fulfillment") == "frame-it-easy-app"
+
+
+def test_unlisted_product_maps_to_pausado():
+    rows = product_to_listing_rows({**PRODUCT, "status": "UNLISTED"}, "2026-11-02T19:00:00+00:00")
+    assert rows[0]["estado"] == "pausado"
+    assert validate_row("Listados", rows[0]) == []
+
+
+def _with_variant_location(line, location_id):
+    return {**line, "variant": {"inventoryItem": {"inventoryLevels": {"nodes": [
+        {"location": {"id": location_id}}]}}}}
+
+
+def test_orders_fall_back_to_variant_location_without_fulfillment_order_scopes():
+    denied = Resp(200, {"errors": [{"message": "Access denied for fulfillmentOrders field.",
+                                    "path": ["orders", "nodes", 0, "fulfillmentOrders"],
+                                    "extensions": {"code": "ACCESS_DENIED"}}]})
+    base = _order()
+    lines = base["lineItems"]["nodes"]
+    order = {**base, "fulfillmentOrders": None, "lineItems": {"nodes": [
+        _with_variant_location(lines[0], "L-prodigi"),
+        _with_variant_location(lines[1], "L-fie"),
+        _with_variant_location(lines[2], "L-manual")]}}
+    services = Resp(200, {"data": {"shop": {"fulfillmentServices": [
+        {"serviceName": "Manual", "location": {"id": "L-manual"}},
+        {"serviceName": "FIE Fulfillment", "location": {"id": "L-fie"}},
+        {"serviceName": "Prodigi", "location": {"id": "L-prodigi"}}]}}})
+    c = client(TOKEN, services, denied, page("orders", [order]))
+    routes = c.location_routes()
+    orders = list(c.iter_orders())
+    assert "fulfillmentOrders" not in c.session.calls[-1][1]["json"]["query"]
+    rows = order_to_rows(orders[0], routes)
+    assert [r["ruta_pod"] for r in rows] == ["prodigi-app", "frame-it-easy-app", "manual"]
+
+
+def test_other_graphql_errors_are_not_swallowed_by_fallback():
+    c = client(TOKEN, Resp(200, {"errors": [{"message": "boom"}]}))
+    with pytest.raises(ShopifyError):
+        list(c.iter_orders())
