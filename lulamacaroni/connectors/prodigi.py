@@ -8,7 +8,12 @@ and product details (for the discontinued-product guard). Creating an order by
 hand is only for reprints and manual orders, and it requires an approved
 ``pedido-manual`` record from the approval gate.
 
-Settings: ``PRODIGI_API_KEY`` and ``PRODIGI_ENV`` (``sandbox`` or ``live``).
+Settings: ``PRODIGI_ENV`` (``sandbox``, the default, or ``live``) picks the key:
+``PRODIGI_SANDBOX_API_KEY`` for sandbox, ``PRODIGI_API_KEY`` for live. Keeping two
+names means a sandbox run can never pick up the live key by accident.
+
+    python -m lulamacaroni.connectors.prodigi --check            # sandbox, read-only
+    PRODIGI_ENV=live python -m lulamacaroni.connectors.prodigi --check
 """
 
 from __future__ import annotations
@@ -24,6 +29,9 @@ BASE_URLS = {
     "sandbox": "https://api.sandbox.prodigi.com/v4.0",
     "live": "https://api.prodigi.com/v4.0",
 }
+
+
+KEY_VARS = {"sandbox": "PRODIGI_SANDBOX_API_KEY", "live": "PRODIGI_API_KEY"}
 
 
 class ProdigiError(RuntimeError):
@@ -48,8 +56,11 @@ class ProdigiClient:
 
     @classmethod
     def from_env(cls) -> "ProdigiClient":
-        return cls(api_key=config.require("PRODIGI_API_KEY"),
-                   env=config.get("PRODIGI_ENV", "sandbox"))
+        env = config.get("PRODIGI_ENV", "sandbox")
+        name = KEY_VARS.get(env)
+        if name is None:
+            raise ValueError(f"PRODIGI_ENV must be one of {sorted(KEY_VARS)}, got {env!r}")
+        return cls(api_key=config.require(name), env=env)
 
     @property
     def base_url(self) -> str:
@@ -125,3 +136,29 @@ def product_is_available(client: ProdigiClient, sku: str) -> bool:
             return False
         raise
     return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Prodigi Print API (read-only check)")
+    parser.add_argument("--check", action="store_true",
+                        help="confirm the key works and count orders; changes nothing")
+    args = parser.parse_args(argv)
+    if not args.check:
+        parser.print_help()
+        return 0
+    client = ProdigiClient.from_env()
+    orders = list(client.iter_orders(page_size=50))
+    statuses: dict[str, int] = {}
+    for o in orders:
+        stage = ((o.get("status") or {}).get("stage")) or "?"
+        statuses[stage] = statuses.get(stage, 0) + 1
+    print(f"Prodigi {client.env}: key OK, {len(orders)} order(s) {statuses or ''}")
+    for o in orders[:3]:  # references only, no recipient data
+        print(f"  {o.get('id')}  ref={o.get('merchantReference')}  created={o.get('created')}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -67,3 +67,29 @@ def test_manual_order_needs_matching_approval(tmp_path):
     sent = c.session.calls[0][3]["json"]
     assert sent["merchantReference"] == rec.aprobacion_id
     assert "merchantReference" not in order  # caller's dict untouched
+
+
+def test_from_env_picks_the_key_for_the_environment(monkeypatch):
+    from lulamacaroni.connectors.prodigi import ProdigiClient
+
+    monkeypatch.setenv("PRODIGI_SANDBOX_API_KEY", "sbx")
+    monkeypatch.setenv("PRODIGI_API_KEY", "live-key")
+    monkeypatch.delenv("PRODIGI_ENV", raising=False)
+    c = ProdigiClient.from_env()
+    assert c.env == "sandbox" and c.api_key == "sbx"
+    monkeypatch.setenv("PRODIGI_ENV", "live")
+    c = ProdigiClient.from_env()
+    assert c.env == "live" and c.api_key == "live-key"
+
+
+def test_sandbox_never_falls_back_to_the_live_key(monkeypatch):
+    import pytest as _pytest
+
+    from lulamacaroni.config import MissingSetting
+    from lulamacaroni.connectors.prodigi import ProdigiClient
+
+    monkeypatch.delenv("PRODIGI_SANDBOX_API_KEY", raising=False)
+    monkeypatch.setenv("PRODIGI_API_KEY", "live-key")
+    monkeypatch.setenv("PRODIGI_ENV", "sandbox")
+    with _pytest.raises(MissingSetting):
+        ProdigiClient.from_env()
