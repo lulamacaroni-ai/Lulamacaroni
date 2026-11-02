@@ -2,7 +2,7 @@
 
 Esta es tu guía para usar el back office (la oficina de atrás) de Lula Macaroni. Está escrita para ti, Lore. Si algo de aquí no coincide con lo que ves en la pantalla, avísale a Jon o pregúntale a Claude en tu proyecto: la guía se corrige, no tú.
 
-> Estado: noviembre de 2026. Algunas partes todavía se están construyendo. Donde una vista aún no existe, lo dice.
+> Estado: noviembre de 2026.
 
 ## 1. Lo que tienes que saber primero
 
@@ -57,7 +57,7 @@ Y cada número tiene una de estas calidades:
 
 ## 4. Las vistas, una por una
 
-La barra de abajo tiene: Inicio, Alertas, Aprobar, Catálogo, Contenido, Anuncios (Publicidad), Pedidos, Clientes, Investigación y Fuentes.
+La barra de abajo tiene: Inicio, Alertas, Aprobar, Catálogo, Contenido, Anuncios (Publicidad), Pedidos, Clientes, Investigación, Finanzas, Semana y Fuentes.
 
 ### Inicio · Resumen del día
 
@@ -145,13 +145,25 @@ Quién te compra, de dónde, cuántas veces y qué les debes. Filtros: **Todos**
 - **Notas y seguimientos**: escribe la nota y una fecha de seguimiento en la pestaña Clientes. Cuando la fecha pasa, aparece en tu resumen del día.
 - Etsy dice “fuente no conectada” hasta que abras la cuenta. Los compradores de Etsy nunca van a una lista de correos de fuera.
 
-### Finanzas (en construcción)
+### Finanzas
 
-Todavía no es una vista aparte. Mientras tanto:
+Qué vendiste, qué te costó, qué llegó al banco y qué todavía no se sabe. Arriba eliges el periodo: **Este mes**, **Mes pasado**, **7 días** o **30 días** (hora de CDMX).
 
-- En **Inicio** ves la venta del periodo y **Por recibir**: el dinero que Shopify Payments tiene pendiente de depositar a tu banco. La venta y el depósito se muestran por separado: nunca se cuentan dos veces.
-- En **Pedidos** ves el margen de cada pedido.
-- Gastos, utilidad y conciliación dicen “fuente no conectada” hasta que se conecte QuickBooks.
+- **Venta bruta, descuentos, ventas netas, envío cobrado.** Los **impuestos cobrados** se muestran aparte: no son tu ingreso, son del estado.
+- **Costos:** comisiones de Shopify Payments, impresión y envío de Prodigi.
+- **Margen antes de anuncios**, margen sobre ventas (%), margen por pedido, gasto en anuncios y **margen después de anuncios**.
+- **Depósitos al banco:** los pagos de Shopify Payments, con sus comisiones y retenciones. La venta y el depósito van separados: un depósito es la misma venta días después, ya sin comisiones, así que sumarlos contaría el dinero dos veces.
+- **EUA (USD) y México (MXN) nunca se suman.** Las ventas de originales de México salen de lo que anotas en la pestaña Pedidos.
+- Lo que depende de otras cuentas dice “fuente no conectada”: Etsy, y el **beneficio del negocio** y el flujo de efectivo, que necesitan QuickBooks.
+
+### Semana · tu resumen semanal
+
+En **Semana** ves la semana pasada (de lunes a domingo) o, si lo eliges, la semana en curso:
+
+- **Resultados** y **Destacados** de la semana.
+- **Lo que sugieren los datos (hipótesis):** solo aparecen cuando hay suficientes pedidos detrás (al menos 5). Que dos cosas pasen juntas no prueba que una cause la otra.
+- **Pruebas y decisiones:** salen de la pestaña **Decisiones** de tu hoja. Cada prueba (un precio nuevo, un anuncio) se anota ahí con su razón y, al terminar, con su resultado.
+- **Prioridades para la semana.**
 
 ### Investigación
 
@@ -184,9 +196,21 @@ Una tabla con cada fuente de datos (Shopify, Prodigi, tu hoja, Etsy, contabilida
 2. Ve a **Aprobar** y decide cada tarjeta.
 3. Si hay alertas rojas, atiéndelas primero (sección 7).
 
-**Cada semana:** revisa Catálogo → Con avisos, y Clientes → Seguimientos.
+**Cada semana:** lee **Semana**, anota tus decisiones en la pestaña Decisiones, y revisa Catálogo → Con avisos y Clientes → Seguimientos.
 
 **Cada mes:** exporta los CSV de eRank y EverBee a la carpeta LulaMacaroni Investigación, revisa tus Topes de publicidad y comparte con tu contador lo que te pida.
+
+## 5b. Tu catálogo de México (sitio en español)
+
+Un sitio en español, solo para ver, con tus originales: sin carrito, sin formularios y sin cookies. Quien quiera comprar te escribe por WhatsApp o correo desde la página de cada obra. Los precios van en MXN con IVA incluido.
+
+Una obra aparece en el sitio cuando:
+
+- en **Variantes** tiene línea `MX-original`, tipo `original`, estado `activa` y su precio con IVA (si falta, dice “Precio a consultar”, nunca $0);
+- en **Obras** está `activa` (una obra **reservada** o **vendida** nunca se muestra) con título, técnica, año, colección y medidas;
+- hay una **foto para web** con el nombre de la obra (por ejemplo `MX-012.jpg`). La foto se usa tal cual: nunca se recorta ni se cambia.
+
+Para publicar, pídele a Claude *“prepara el sitio de México”*. Te llega a **Aprobar** una tarjeta con todas las obras, precios, fotos, datos de contacto y el aviso de privacidad. Solo se publica lo que aprobaste: si algo cambió después, te pide aprobar otra vez. Cuando vendas una obra, márcala `vendida` en Obras y el sistema te avisa para retirarla del sitio.
 
 ## 6. “Fuente no conectada”
 
