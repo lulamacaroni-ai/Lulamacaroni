@@ -37,15 +37,34 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
             "canal": "shopify", "fecha": _iso(now - timedelta(days=days)),
             "sku": listados[pi * 3 + vi - 1]["sku"], "cantidad": 1, "moneda": "USD",
             "venta_bruta": price, "descuento": 0, "impuesto_cobrado": 0, "envio_cobrado": 0,
-            "reembolso": refund, "ruta_pod": ruta, "estado": estado, "calidad_dato": "faltante",
-            "producto": f"{titles[pi]} - {('8x10', '12x16', '18x24')[vi - 1]}",
+            "reembolso": refund, "ruta_pod": ruta, "estado": estado,             "producto": f"{titles[pi]} - {('8x10', '12x16', '18x24')[vi - 1]}",
             "tracking": "DEMO123" if estado in ("enviado", "entregado") else "",
+            "numero_canal": f"#{n}",
+            # Shopify Payments fee (2.9% + 30¢); Prodigi charge once Prodigi has billed it
+            "comision_canal": round(price * 0.029 + 0.30, 2),
+            **({"pod_pedido_id": f"ord_demo{n}", "costo_pod": 28.0 + 6 * vi, "envio_pod": 7.5}
+               if ruta == "prodigi-app" and estado != "recibido" else {}),
         })
     fuentes = [{"fuente": "shopify", "ultima_actualizacion": _iso(now - timedelta(minutes=12)),
-                "estado": "ok", "filas": len(listados) + len(pedidos), "nota": ""}]
-    return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes}
+                "estado": "ok", "filas": len(listados) + len(pedidos), "nota": ""},
+               {"fuente": "shopify-pagos", "ultima_actualizacion": _iso(now - timedelta(minutes=12)),
+                "estado": "ok", "filas": 2, "nota": ""}]
+    pagos = [
+        {"pago_id": "shopify-payout-1", "linea": "US-POD", "canal": "shopify",
+         "fecha": _iso(now - timedelta(days=8)), "moneda": "USD", "monto_depositado": 94.81,
+         "comisiones": 5.19, "retenciones": 0, "reembolsos": 0, "conciliado": "no",
+         "estado": "pagado"},
+        {"pago_id": "shopify-payout-2", "linea": "US-POD", "canal": "shopify",
+         "fecha": _iso(now + timedelta(days=1)), "moneda": "USD", "monto_depositado": 77.38,
+         "comisiones": 2.62, "retenciones": 0, "reembolsos": 0, "conciliado": "no",
+         "estado": "en-transito"},
+    ]
+    return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos}
 
 
 def fill_demo(book, now: datetime | None = None) -> None:
+    from ..margen import recalcular
+
     for tab_name, rows in demo_rows(now).items():
         book.upsert(tab_name, rows)
+    recalcular(book)

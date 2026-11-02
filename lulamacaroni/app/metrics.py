@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .. import config
+from ..margen import faltan as costos_faltantes
 
 TZ = ZoneInfo(config.get("LULA_TZ", "America/Mexico_City"))
 
@@ -32,8 +33,10 @@ class FuenteInfo:
 
 FUENTES = (
     FuenteInfo("shopify", "Shopify", "API", 26, "conectada"),
+    FuenteInfo("shopify-pagos", "Pagos de Shopify (payouts)", "API", 26,
+               "falta dar a la app de Shopify los permisos de pagos"),
     FuenteInfo("etsy", "Etsy", "API", 26, "siguiente conector"),
-    FuenteInfo("prodigi", "Prodigi", "API", 26, "falta la llave de sandbox"),
+    FuenteInfo("prodigi", "Prodigi", "API", 26, "llaves listas; falta la primera sincronización"),
     FuenteInfo("quickbooks", "QuickBooks", "API", 48, "cuando exista la cuenta"),
     FuenteInfo("meta", "Meta Ads", "API", 26, "requiere revisión de app de Meta"),
     FuenteInfo("instagram", "Instagram", "API", 26, "requiere revisión de app de Meta"),
@@ -199,7 +202,7 @@ class Resumen:
 
 
 def resumen(pedidos: list[dict], campanas: list[dict], fuentes: dict[str, EstadoFuente],
-            per: Periodo) -> Resumen:
+            per: Periodo, pagos: list[dict] | None = None) -> Resumen:
     shop = fuentes["shopify"]
     etsy = fuentes["etsy"]
     canales_vivos = [f.info.nombre for f in (shop, etsy) if f.conectada]
@@ -256,26 +259,50 @@ def resumen(pedidos: list[dict], campanas: list[dict], fuentes: dict[str, Estado
                           min((f.actualizado for f in ads if f.actualizado), default=None),
                           "usd", round(gasto_prev, 2)))
 
-    # Contribution margin needs channel fees, Prodigi cost and ad spend for every line.
-    sin_costos = [r for r in vivos_act if r.get("calidad_dato") != "real"]
-    if not canales_vivos or sin_costos or not ads:
-        motivo = []
-        if sin_costos:
-            motivo.append(f"{len(sin_costos)} línea(s) sin comisión o coste de Prodigi")
-        if not ads:
-            motivo.append("sin gasto publicitario")
-        if not canales_vivos:
-            motivo.append("sin canales de venta")
+    # Margin per line comes from lulamacaroni.margen (fees + Prodigi cost known or not).
+    fuente_margen = "Pedidos (Shopify) + comisiones de Shopify Payments + cargos de Prodigi"
+    def_margen = ("Ventas netas + envío cobrado − comisiones del canal − coste y envío de "
+                  "Prodigi, de los pedidos creados en el periodo. Sin impuestos.")
+    sin_costos = [r for r in vivos_act if r.get("calidad_dato") not in ("real", "estimado")]
+    if not canales_vivos:
+        datos.append(faltante("Margen antes de anuncios", fuente_margen, per.texto, def_margen,
+                              "Ningún canal de venta conectado.", enlace="/pedidos"))
+    elif sin_costos:
+        que = Counter(c for r in sin_costos for c in costos_faltantes(r))
+        detalle = ", ".join(f"{n} sin {NOMBRE_FALTA[c]}" for c, n in que.items())
         datos.append(faltante(
-            "Margen de contribución", "Pedidos + Prodigi + pagos + anuncios", per.texto,
-            "Ventas netas − comisiones del canal − coste y envío de Prodigi − gasto publicitario.",
-            "Falta: " + "; ".join(motivo) + "." if motivo else "", enlace="/pedidos"))
+            "Margen antes de anuncios", fuente_margen, per.texto, def_margen,
+            f"{len(sin_costos)} de {len(vivos_act)} línea(s) sin todos sus costos ({detalle}).",
+            enlace="/pedidos"))
     else:
-        margen = sum(num(r.get("margen_contribucion")) or 0 for r in vivos_act) - datos[2].valor
-        datos.append(Dato("Margen de contribución", round(margen, 2), "real",
-                          "Pedidos + Prodigi + pagos + anuncios", per.texto,
-                          "Ventas netas − comisiones − coste y envío de Prodigi − publicidad.",
-                          actualizado, "usd"))
+        calidad = "estimado" if any(r.get("calidad_dato") == "estimado" for r in vivos_act) else "real"
+        prev_ok = vivos_prev and all(r.get("calidad_dato") == "real" for r in vivos_prev)
+        datos.append(Dato(
+            "Margen antes de anuncios",
+            round(sum(num(r.get("margen_contribucion")) or 0 for r in vivos_act), 2), calidad,
+            fuente_margen, per.texto, def_margen, actualizado, "usd",
+            round(sum(num(r.get("margen_contribucion")) or 0 for r in vivos_prev), 2)
+            if prev_ok else None,
+            nota="Incluye costos estimados." if calidad == "estimado" else "",
+            enlace="/pedidos"))
+    antes = datos[-1]
+
+    gasto_ads = next(d for d in datos if d.etiqueta == "Gasto publicitario")
+    if antes.calidad == "faltante" or gasto_ads.calidad == "faltante":
+        motivo = []
+        if antes.calidad == "faltante":
+            motivo.append("falta el margen antes de anuncios")
+        if gasto_ads.calidad == "faltante":
+            motivo.append("sin gasto publicitario (Meta y Pinterest no conectados)")
+        datos.append(faltante(
+            "Margen de contribución", fuente_margen + " + anuncios", per.texto,
+            "Margen antes de anuncios − gasto publicitario del periodo.",
+            "Falta: " + "; ".join(motivo) + ".", enlace="/pedidos"))
+    else:
+        datos.append(Dato("Margen de contribución", round(antes.valor - gasto_ads.valor, 2),
+                          antes.calidad, fuente_margen + " + anuncios", per.texto,
+                          "Margen antes de anuncios − gasto publicitario del periodo.",
+                          actualizado, "usd", enlace="/pedidos"))
 
     if canales_vivos:
         reemb = [r for r in act if (num(r.get("reembolso")) or 0) > 0]
@@ -293,11 +320,7 @@ def resumen(pedidos: list[dict], campanas: list[dict], fuentes: dict[str, Estado
                               "Monto reembolsado de los pedidos del periodo.",
                               "Ningún canal de venta conectado.", enlace="/pedidos"))
 
-    datos.append(faltante(
-        "Por recibir", "Pagos de Shopify y Etsy", "a la fecha",
-        "Ventas cobradas que aún no llegan como depósito al banco.",
-        "Los pagos (payouts) aún no se sincronizan; la venta bruta y el depósito se "
-        "llevan por separado."))
+    datos.append(por_recibir(pagos or [], fuentes))
 
     ventas_por = Counter()
     for r in vivos_act:
@@ -307,6 +330,28 @@ def resumen(pedidos: list[dict], campanas: list[dict], fuentes: dict[str, Estado
     for r in vivos_act:
         por_linea[r.get("linea", "")] += neto_linea(r)
     return Resumen(per, datos, len({r["pedido_id"] for r in vivos_act}), mas, dict(por_linea))
+
+
+NOMBRE_FALTA = {"comision_canal": "comisión", "costo_pod": "coste de impresión",
+                "envio_pod": "envío de imprenta"}
+
+
+def por_recibir(pagos: list[dict], fuentes: dict[str, EstadoFuente]) -> Dato:
+    """Payouts Shopify has scheduled or sent that have not reached the bank yet."""
+    f = fuentes.get("shopify-pagos")
+    definicion = ("Pagos (payouts) de Shopify Payments programados o en camino al banco. "
+                  "No incluye ventas que Shopify aún no asigna a un pago. La venta bruta y "
+                  "el depósito se llevan por separado.")
+    if f is None or not f.conectada:
+        return faltante("Por recibir", "Pagos de Shopify (payouts)", "a la fecha", definicion,
+                        "Falta dar a la app de Shopify los permisos de pagos." if f is None
+                        or f.estado == "sin-conectar" else "Los pagos tienen error.",
+                        enlace="/fuentes")
+    pend = [p for p in pagos if p.get("canal") == "shopify"
+            and p.get("estado") in ("programado", "en-transito")]
+    return Dato("Por recibir", round(sum(num(p.get("monto_depositado")) or 0 for p in pend), 2),
+                "real", "Pagos de Shopify (payouts)", "a la fecha", definicion, f.actualizado,
+                "usd", nota=f"{len(pend)} pago(s) en camino. Etsy aún no conectado.")
 
 
 # --- orders ------------------------------------------------------------------------------
@@ -327,6 +372,9 @@ class Pedido:
     neto: float
     rutas: set[str]
     tracking: str
+    margen: float | None = None
+    calidad_margen: str = "faltante"
+    faltan: list[str] = field(default_factory=list)
 
     @property
     def atencion(self) -> str:
@@ -355,12 +403,22 @@ def agrupar_pedidos(pedidos_rows: list[dict]) -> list[Pedido]:
         first = lines[0]
         estados = {r.get("estado") for r in lines}
         estado = "excepcion" if "excepcion" in estados else first.get("estado", "")
+        calidades = {r.get("calidad_dato") for r in lines}
+        if calidades <= {"real", "estimado"}:
+            calidad = "estimado" if "estimado" in calidades else "real"
+            margen = round(sum(num(r.get("margen_contribucion")) or 0 for r in lines), 2)
+        else:
+            calidad, margen = "faltante", None
+        falta = list(dict.fromkeys(c for r in lines if r.get("calidad_dato") not in
+                                   ("real", "estimado") for c in costos_faltantes(r)))
+        numero = (first.get("numero_canal") or "").lstrip("#") or _orden_num(pid)
         out.append(Pedido(
-            pid, _orden_num(pid), first.get("canal", ""), first.get("linea", ""),
+            pid, numero, first.get("canal", ""), first.get("linea", ""),
             parse_dt(first.get("fecha")), estado, lines,
             round(sum(neto_linea(r) for r in lines), 2),
             {r.get("ruta_pod") or "desconocida" for r in lines},
-            ", ".join(t for t in dict.fromkeys(r.get("tracking", "") for r in lines) if t)))
+            ", ".join(t for t in dict.fromkeys(r.get("tracking", "") for r in lines) if t),
+            margen, calidad, falta))
     out.sort(key=lambda p: p.fecha or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return out
 

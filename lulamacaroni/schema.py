@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 LINEAS = ("US-POD", "MX-original")
 LINEAS_GASTOS = LINEAS + ("compartido",)
 
+ESTADOS_PAGO = ("programado", "en-transito", "pagado", "fallido", "cancelado")
+
 CANALES = ("shopify", "etsy", "sitio-mx", "whatsapp", "instagram", "pinterest", "otro")
 
 TIPOS_VARIANTE = ("original", "impresion", "enmarcado", "descargable")
@@ -133,7 +135,7 @@ TABS: tuple[Tab, ...] = (
             "moneda", "venta_bruta", "descuento", "impuesto_cobrado", "envio_cobrado",
             "comision_canal", "costo_pod", "envio_pod", "reembolso", "margen_contribucion",
             "ruta_pod", "pod_pedido_id", "tracking", "estado", "calidad_dato",
-            "producto",
+            "producto", "numero_canal",
         ),
         validaciones={
             "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,
@@ -147,9 +149,10 @@ TABS: tuple[Tab, ...] = (
         columnas=(
             "pago_id", "linea", "canal", "fecha", "moneda", "monto_depositado",
             "comisiones", "retenciones", "reembolsos", "pedidos_incluidos",
-            "conciliado", "nota",
+            "conciliado", "nota", "estado",
         ),
-        validaciones={"linea": LINEAS, "canal": CANALES, "conciliado": ("si", "no")},
+        validaciones={"linea": LINEAS, "canal": CANALES, "conciliado": ("si", "no"),
+                      "estado": ESTADOS_PAGO},
     ),
     Tab(
         nombre="Gastos",

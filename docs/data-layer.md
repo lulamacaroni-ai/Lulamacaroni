@@ -106,6 +106,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `estado` | recibido, enviado-a-pod, en-produccion, enviado, entregado, cancelado, reembolsado, excepcion |
 | `calidad_dato` | real, estimado, faltante |
 | `producto` |  |
+| `numero_canal` |  |
 
 ### Pagos
 
@@ -125,6 +126,7 @@ One row per: Un depósito o payout recibido (kept apart from the gross sale). Ke
 | `pedidos_incluidos` |  |
 | `conciliado` | si, no |
 | `nota` |  |
+| `estado` | programado, en-transito, pagado, fallido, cancelado |
 
 ### Gastos
 

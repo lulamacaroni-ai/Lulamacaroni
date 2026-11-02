@@ -196,6 +196,24 @@ class ShopifyClient:
                                      {**variables, "after": conn["pageInfo"]["endCursor"]},
                                      page_size=25)
 
+    def iter_payouts(self) -> Iterator[dict]:
+        """Shopify Payments payouts, newest first.
+
+        Needs the ``read_shopify_payments_payouts`` and ``read_shopify_payments_accounts``
+        scopes; without them Shopify answers ACCESS_DENIED (see :func:`payouts_denied`).
+        """
+        cursor = None
+        while True:
+            data = self.graphql(PAYOUTS_QUERY, {"first": 50, "after": cursor})
+            account = data.get("shopifyPaymentsAccount")
+            if not account:  # store without Shopify Payments
+                return
+            conn = account["payouts"]
+            yield from conn["nodes"]
+            if not conn["pageInfo"]["hasNextPage"]:
+                return
+            cursor = conn["pageInfo"]["endCursor"]
+
     # -- writes (gated) ----------------------------------------------------------
     def create_draft_product(self, product: dict, *, approval) -> dict:
         """Create a product as DRAFT. Publishing it is a separate approved step in Shopify."""
@@ -269,6 +287,10 @@ query Orders($first: Int!, $after: String, $query: String) {
         trackingInfo { number }
         fulfillmentLineItems(first: 50) { nodes { lineItem { id } } }
       }
+      transactions(first: 20) {
+        kind status gateway
+        fees { amount { amount } type }
+      }
     }
   }
 }
@@ -286,6 +308,25 @@ ORDERS_QUERY_BY_VARIANT = ORDERS_QUERY.replace("""
           taxLines { priceSet { shopMoney { amount } } }""", """
           taxLines { priceSet { shopMoney { amount } } }
           variant { inventoryItem { inventoryLevels(first: 5) { nodes { location { id } } } } }""")
+
+PAYOUTS_QUERY = """
+query Payouts($first: Int!, $after: String) {
+  shopifyPaymentsAccount {
+    payouts(first: $first, after: $after, sortKey: ISSUED_AT, reverse: true) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id legacyResourceId issuedAt status transactionType
+        net { amount currencyCode }
+        summary {
+          chargesFee { amount } refundsFee { amount } adjustmentsFee { amount }
+          reservedFundsFee { amount } retriedPayoutsFee { amount }
+          refundsFeeGross { amount } reservedFundsGross { amount }
+        }
+      }
+    }
+  }
+}
+"""
 
 FULFILLMENT_SERVICES_QUERY = """
 { shop { fulfillmentServices { serviceName location { id } } } }
@@ -363,12 +404,63 @@ def _variant_route(line: dict, location_routes: dict[str, str]) -> str:
     return routes.pop() if len(routes) == 1 else "desconocida"
 
 
+# Payment gateways whose fee Shopify reports on the transaction. Other gateways (PayPal,
+# manual payments) charge outside Shopify, so their fee is unknown here, never zero.
+FEE_GATEWAYS = {"shopify_payments"}
+FEE_FREE_GATEWAYS = {"gift_card"}
+PAID_KINDS = {"SALE", "CAPTURE"}
+
+
+def order_fee(order: dict) -> float | None:
+    """Total Shopify Payments fee on the order, or None if a fee is unknown.
+
+    Sums the fees of every successful transaction (Shopify does not give the processing
+    fee back on a refund, so it stays). An order with no successful payment has a real
+    fee of 0.
+    """
+    total = 0.0
+    for t in order.get("transactions") or []:
+        if t.get("status") != "SUCCESS":
+            continue
+        gateway = (t.get("gateway") or "").lower()
+        if t.get("kind") in PAID_KINDS and gateway not in FEE_GATEWAYS | FEE_FREE_GATEWAYS:
+            return None
+        for f in t.get("fees") or []:
+            try:
+                total += float(f["amount"]["amount"])
+            except (KeyError, TypeError, ValueError):
+                return None
+    return round(total, 2)
+
+
+def split_fee(fee: float | None, weights: list[float]) -> list:
+    """Split an order fee across its lines by sale share; cents add up exactly.
+
+    Unknown fee -> "" on every line (``faltante``).
+    """
+    if fee is None:
+        return ["" for _ in weights]
+    if not weights:
+        return []
+    total = sum(w for w in weights if w > 0)
+    if total <= 0:
+        parts = [0.0] * len(weights)
+        parts[0] = fee
+        return parts
+    parts = [round(fee * max(w, 0) / total, 2) for w in weights]
+    parts[-1] = round(fee - sum(parts[:-1]), 2)
+    return parts
+
+
 def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) -> list[dict]:
     """One ``Pedidos`` row per line item.
 
-    Sale amounts are real. Channel fees (Shopify Payments) and Prodigi cost are not in
-    the order: they stay empty and the row is ``faltante`` until the payouts and Prodigi
-    syncs fill them, so a missing cost is never read as zero margin.
+    Sale amounts are real. ``comision_canal`` is the real Shopify Payments fee from the
+    order's transactions, split across lines by their share of the sale; it stays empty
+    when a payment went through another gateway (PayPal, etc.), whose fee Shopify does
+    not report. Prodigi cost, ``margen_contribucion`` and ``calidad_dato`` are left out
+    on purpose: the Prodigi sync owns the costs and :func:`lulamacaroni.margen.recalcular`
+    owns the margin, so a Shopify re-sync never wipes a cost already filled in.
     """
     if order.get("test"):
         return []
@@ -387,6 +479,8 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
     shipping = _money((order.get("shippingLine") or {}).get("originalPriceSet"))
     refunded = _money(order.get("totalRefundedSet"))
     estado = _order_state(order)
+    fees = split_fee(order_fee(order), [
+        _money(li["originalTotalSet"]) - _money(li["totalDiscountSet"]) for li in lines])
     rows = []
     for i, li in enumerate(lines):
         line_id = li["id"].rsplit("/", 1)[-1]
@@ -405,19 +499,54 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
             # order-level amounts sit on the first line so they are counted once
             "envio_cobrado": shipping if i == 0 else 0.0,
             "reembolso": refunded if i == 0 else 0.0,
-            "comision_canal": "",
-            "costo_pod": "",
-            "envio_pod": "",
-            "margen_contribucion": "",
+            "comision_canal": fees[i],
             "ruta_pod": route_by_line.get(li["id"])
             or (_variant_route(li, location_routes) if location_routes is not None
                 else "desconocida"),
             "tracking": ", ".join(dict.fromkeys(tracking_by_line.get(li["id"], []))),
             "estado": estado,
-            "calidad_dato": "faltante",
             "producto": li.get("name") or "",
+            "numero_canal": order.get("name") or "",
         })
     return rows
+
+
+PAYOUT_STATUS = {"SCHEDULED": "programado", "IN_TRANSIT": "en-transito", "PAID": "pagado",
+                 "FAILED": "fallido", "CANCELED": "cancelado"}
+
+
+def _amount(node: dict | None) -> float:
+    try:
+        return float(node["amount"])  # type: ignore[index]
+    except (TypeError, KeyError, ValueError):
+        return 0.0
+
+
+def payout_to_row(payout: dict) -> dict:
+    """One ``Pagos`` row: what actually reaches the Chase account, kept apart from sales."""
+    summ = payout.get("summary") or {}
+    sign = -1 if payout.get("transactionType") == "WITHDRAWAL" else 1
+    fees = sum(_amount(summ.get(k)) for k in ("chargesFee", "refundsFee", "adjustmentsFee",
+                                              "reservedFundsFee", "retriedPayoutsFee"))
+    return {
+        "pago_id": f"shopify-payout-{payout['legacyResourceId']}",
+        "linea": "US-POD",
+        "canal": "shopify",
+        "fecha": payout.get("issuedAt") or "",
+        "moneda": (payout.get("net") or {}).get("currencyCode") or "USD",
+        "monto_depositado": round(sign * _amount(payout.get("net")), 2),
+        "comisiones": round(fees, 2),
+        "retenciones": round(_amount(summ.get("reservedFundsGross")), 2),
+        "reembolsos": round(abs(_amount(summ.get("refundsFeeGross"))), 2),
+        "estado": PAYOUT_STATUS.get(payout.get("status") or "", ""),
+    }
+
+
+def payouts_denied(error: ShopifyError) -> bool:
+    return _denied_field(error, "shopifyPaymentsAccount") or _denied_field(error, "payouts")
+
+
+PAYOUT_SCOPES = "read_shopify_payments_payouts y read_shopify_payments_accounts"
 
 
 # --- CLI --------------------------------------------------------------------------
@@ -446,6 +575,14 @@ def main(argv: list[str] | None = None) -> int:
           f"sin ruta POD clara: {len(unrouted)}")
 
     if args.dry_run:
+        known = [o for o in orders if o["comision_canal"] != ""]
+        print(f"Comisión Shopify Payments conocida en {len(known)} de {len(orders)} líneas")
+        try:
+            print(f"Pagos (payouts): {len(list(client.iter_payouts()))}")
+        except ShopifyError as e:
+            if not payouts_denied(e):
+                raise
+            print(f"Pagos: sin permiso ({PAYOUT_SCOPES})")
         for row in listings[:3] + orders[:3]:
             print(json.dumps(row, ensure_ascii=False))
         return 0
@@ -458,13 +595,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     from ..localbook import open_workbook
+    from ..margen import recalcular
 
     wb = open_workbook()  # the Google Sheet if LULA_WORKBOOK_ID is set, else data/libro/
     wb.upsert("Listados", listings)
     wb.upsert("Pedidos", orders)
     wb.stamp_source("shopify", rows=len(listings) + len(orders),
                     note=f"{len(unrouted)} líneas sin ruta POD clara" if unrouted else "")
+    sync_payouts(client, wb)
+    recalcular(wb)
     return 0
+
+
+def sync_payouts(client: ShopifyClient, wb) -> int | None:
+    """Upsert Shopify Payments payouts into ``Pagos``; None if the app lacks the scopes."""
+    try:
+        rows = [payout_to_row(p) for p in client.iter_payouts()]
+    except ShopifyError as e:
+        if not payouts_denied(e):
+            raise
+        wb.stamp_source("shopify-pagos", rows=0, estado="sin-conectar",
+                        note=f"La app de Shopify no tiene los permisos {PAYOUT_SCOPES}.")
+        print(f"Pagos: sin permiso ({PAYOUT_SCOPES}); no se sincronizaron.")
+        return None
+    if rows:
+        wb.upsert("Pagos", rows)
+    wb.stamp_source("shopify-pagos", rows=len(rows))
+    print(f"Pagos (payouts): {len(rows)}")
+    return len(rows)
 
 
 if __name__ == "__main__":

@@ -153,7 +153,11 @@ def test_order_amounts_counted_once_and_costs_marked_missing():
     assert rows[0]["venta_bruta"] == 95 and rows[0]["descuento"] == 5
     assert rows[0]["impuesto_cobrado"] == 6.3
     assert [r["envio_cobrado"] for r in rows] == [8, 0, 0]
-    assert all(r["costo_pod"] == "" and r["calidad_dato"] == "faltante" for r in rows)
+    # Prodigi cost and margin belong to other syncs: a Shopify re-sync must not wipe them
+    for col in ("costo_pod", "envio_pod", "pod_pedido_id", "margen_contribucion", "calidad_dato"):
+        assert all(col not in r for r in rows)
+    assert [r["comision_canal"] for r in rows] == [0.0, 0.0, 0.0]  # nothing paid: real zero fee
+    assert rows[0]["numero_canal"] == "#1001"
     assert rows[0]["linea_pedido_id"] == "shopify-500-1"
 
 

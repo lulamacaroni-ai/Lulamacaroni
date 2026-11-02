@@ -21,6 +21,7 @@ class Datos:
         self.campanas = book.read("Campanas")
         self.excepciones = book.read("Excepciones")
         self.obras = book.read("Obras")
+        self.pagos = book.read("Pagos")
         self.fuentes = m.estado_fuentes(book.read("Fuentes"), self.now)
         self.approvals = store.all()
         self.pedidos = m.agrupar_pedidos(self.pedidos_rows)
@@ -36,7 +37,8 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
     if path == "/":
         clave = params.get("p", "7")
         clave = clave if clave in m.PERIODOS else "7"
-        res = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, m.periodo(clave, d.now))
+        res = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, m.periodo(clave, d.now),
+                        d.pagos)
         acciones = m.acciones_del_dia(d.pendientes, d.pedidos, d.productos, d.fuentes,
                                       d.excepciones)
         return views.inicio(res, acciones, d.fuentes, d.now, banner=banner)
