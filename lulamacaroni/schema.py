@@ -75,6 +75,9 @@ DESTINOS_ANUNCIO = ("shopify", "etsy", "sitio-mx", "instagram", "otro")
 # What Shopify's customer journey says about the visit that led to an order
 ESTADOS_ORIGEN = ("ok", "sin-recorrido", "pendiente", "sin-permiso")
 
+# A follow-up Lorena (or a reply draft) owes a customer
+ESTADOS_SEGUIMIENTO = ("pendiente", "hecho", "cancelado")
+
 ORIENTACIONES = ("vertical", "horizontal", "cuadrada")
 
 
@@ -158,6 +161,8 @@ TABS: tuple[Tab, ...] = (
             # UTM tags and the referring site's domain only, never a full URL or the buyer
             "origen_estado", "origen_fuente", "origen_tipo", "utm_fuente", "utm_medio",
             "utm_campana", "referente",
+            # the buyer, as a Clientes key (``shopify-cliente-<id>``); "" for a guest checkout
+            "cliente_id",
         ),
         validaciones={
             "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,
@@ -193,10 +198,19 @@ TABS: tuple[Tab, ...] = (
         columnas=(
             "cliente_id", "linea", "canal_origen", "nombre", "pais", "consentimiento_email",
             "primer_pedido", "pedidos", "nota",
+            # Shopify customers are synced (see connectors/shopify.py); Mexico buyers are
+            # typed by Lorena. Never an email, phone or street address: country and
+            # state/province only, and the name as first name + last initial.
+            "region", "total", "moneda", "ultimo_pedido", "cliente_desde",
+            "nota_shopify",                 # the store's own customer note (synced)
+            "nota_por", "nota_fecha",       # who wrote ``nota`` and when
+            "seguimiento", "seguimiento_para", "seguimiento_estado",
+            "ultima_sync",
         ),
         validaciones={
             "linea": LINEAS, "canal_origen": CANALES,
             "consentimiento_email": ("si", "no", "desconocido"),
+            "seguimiento_estado": ESTADOS_SEGUIMIENTO,
         },
     ),
     Tab(

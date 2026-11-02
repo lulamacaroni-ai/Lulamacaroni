@@ -35,6 +35,8 @@ FUENTES = (
     FuenteInfo("shopify", "Shopify", "API", 26, "conectada"),
     FuenteInfo("shopify-pagos", "Pagos de Shopify (payouts)", "API", 26,
                "falta dar a la app de Shopify los permisos de pagos"),
+    FuenteInfo("shopify-clientes", "Clientes de Shopify", "API", 26,
+               "aún sin sincronizar (corre el sync de Shopify)"),
     FuenteInfo("etsy", "Etsy", "API", 26, "aún no existe la cuenta de Etsy"),
     FuenteInfo("prodigi", "Prodigi", "API", 26, ""),  # text from prodigi_fase()
     FuenteInfo("quickbooks", "QuickBooks", "API", 48, "aún no existe la cuenta de QuickBooks"),

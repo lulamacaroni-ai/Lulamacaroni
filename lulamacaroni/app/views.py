@@ -30,7 +30,7 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
 
 NAV = (("/", "Inicio"), ("/alertas", "Alertas"), ("/aprobar", "Aprobar"),
        ("/catalogo", "Catálogo"), ("/contenido", "Contenido"), ("/publicidad", "Anuncios"),
-       ("/pedidos", "Pedidos"), ("/fuentes", "Fuentes"))
+       ("/pedidos", "Pedidos"), ("/clientes", "Clientes"), ("/fuentes", "Fuentes"))
 
 CSS = """
 :root{--bg:#FBF8F3;--card:#FFFFFF;--ink:#1C1C1E;--muted:#4A4A50;--line:#E0D6C8;
@@ -142,6 +142,10 @@ def valor(d: Dato) -> str:
         text = usd(d.valor)
     elif d.formato == "x":
         text = f"{d.valor:,.2f}×"
+    elif d.formato == "mxn":
+        text = ("−" if d.valor < 0 else "") + f"MX${abs(d.valor):,.2f}"
+    elif d.formato == "fecha":
+        text = fecha(datetime.fromtimestamp(d.valor, TZ), hora=False)
     else:
         text = f"{d.valor:,.0f}"
     return ("~" + text) if d.calidad == "estimado" else text
@@ -686,6 +690,89 @@ def publicidad_view(cs: list, datos: list[Dato], filas_origen: list, plan: list,
         "conectada: “—”). Etsy no comparte el origen de la visita: sus anuncios se medirán con "
         "los reportes de Etsy Ads. Una atribución no prueba que el anuncio causó la venta.</p>")
     return page("Publicidad", "/publicidad", "".join(body), banner)
+
+
+# --- Clientes ---------------------------------------------------------------------------------
+
+def _cliente(c, now: datetime) -> str:
+    meta = [LINEA.get(c.linea, c.linea or "línea —"),
+            CANAL.get(c.canal, c.canal or "canal —"), c.lugar, c.consentimiento]
+    if c.desde:
+        meta.append(f"cliente desde {fecha(c.desde, hora=False)}")
+    origen = (f'<span title="{escape(c.origen.nota)}">{escape(c.origen.texto)}</span> '
+              + ('<span class="q real">real</span>' if c.origen.calidad == "real"
+                 else '<span class="q faltante">falta el dato</span>'))
+    notas = "".join(
+        f'<div class="m">📝 {escape(t)} <span class="meta">({escape(p)})</span></div>'
+        for t, p in c.notas)
+    seg = ""
+    if c.seguimiento:
+        s = c.seguimiento
+        para = fecha(datetime.combine(s.para, datetime.min.time(), TZ), hora=False) \
+            if s.para else "sin fecha"
+        cls = "warn" if s.vencido else ("amber" if s.estado == "pendiente" else "gray")
+        txt = "vencido" if s.vencido else s.estado
+        seg = (f'<div class="m{" w" if s.vencido else ""}">Seguimiento: {escape(s.texto)} · '
+               f'para {escape(para)} <span class="badge {cls}">{escape(txt)}</span></div>')
+    rows = [("Pedidos", c.pedidos), ("Total", c.total), ("Último pedido", c.ultimo)]
+    dl = "".join(
+        f"<dt>{escape(k)}</dt><dd>{escape(d.fuente)} · {escape(d.periodo)} · "
+        f"{escape(d.definicion)} · actualizado "
+        f"{escape(hace(d.actualizado, now) if d.actualizado else '—')}"
+        + (f" · {escape(d.nota)}" if d.nota else "") + "</dd>" for k, d in rows)
+    alert = " alert" if c.vencido else ""
+    return (f'<div class="card{alert}"><div class="row"><div>'
+            f'<div class="t">{escape(c.nombre)}</div>'
+            f'<div class="m">{escape(" · ".join(meta))}</div>'
+            f'<div class="m">Pedidos {_celda(c.pedidos)} · Total {_celda(c.total)} · '
+            f'Último {_celda(c.ultimo)}</div>'
+            f'<div class="m">Cómo llegó: {origen}</div>{notas}{seg}'
+            f'<details class="m"><summary>¿De dónde sale?</summary><dl>{dl}</dl></details>'
+            f'</div><div class="r">{escape(valor(c.total))}</div></div></div>')
+
+
+def clientes_view(cs: list, datos: list[Dato], origenes: list, filtro: str, per,
+                  fuentes: dict[str, EstadoFuente], now: datetime, banner: str = "") -> str:
+    from .clientes import FILTROS
+
+    chips = "".join(
+        f'<a class="chip{" on" if k == per.clave else ""}" '
+        f'href="/clientes?p={k}&amp;f={escape(filtro)}">{t}</a>'
+        for k, t in (("hoy", "Hoy"), ("7", "7 días"), ("30", "30 días")))
+    tabs = "".join(
+        f'<a class="chip{" on" if k == filtro else ""}" href="/clientes?f={k}">{escape(t)}</a>'
+        for k, t in FILTROS.items())
+    body = ['<h1>Clientes</h1><p class="sub">Quién compra, cada cuánto, desde dónde y qué '
+            "seguimiento les debes. Solo lectura: notas y seguimientos se escriben en la "
+            "pestaña Clientes. Sin correos, teléfonos ni direcciones: solo nombre corto, país "
+            "y estado.</p>",
+            f'<div class="chips">{chips}<span class="vs">{escape(per.texto)}</span></div>',
+            f'<div class="grid">{"".join(_kpi(d, now) for d in datos)}</div>']
+    if origenes:
+        rows = "".join(f"<tr><td>{escape(k)}</td><td>{n}</td></tr>" for k, n in origenes)
+        body.append("<h2>Cómo llegaron (primer pedido)</h2><div class='tablebox'><table>"
+                    "<thead><tr><th>Origen</th><th>Clientes</th></tr></thead>"
+                    f"<tbody>{rows}</tbody></table></div>")
+    body.append(f'<div class="tabs">{tabs}</div>')
+    body.append("".join(_cliente(c, now) for c in cs)
+                or '<p class="empty">Nadie en este filtro.</p>')
+    etsy = fuentes["etsy"]
+    if not etsy.conectada:
+        body.append('<div class="card info"><div class="t">Etsy</div><div class="m">Fuente no '
+                    f"conectada ({escape(etsy.nota or etsy.info.fase)}). Sus compradores "
+                    "aparecerán aquí con canal Etsy y nunca se mandan a una lista de correo "
+                    "externa.</div></div>")
+    sync = fuentes.get("shopify-clientes")
+    body.append(
+        '<p class="legend">EUA: clientes de Shopify; pedidos, total y último pedido son las '
+        "cifras de Shopify para toda la historia del cliente (actualizado "
+        f"{hace(sync.actualizado if sync else None, now)}). México: lo que Lore anota en la "
+        "pestaña Clientes (linea MX-original), en pesos con IVA; si Pedidos tiene sus "
+        "pedidos, cuentan esos. “Cómo llegó”: la última visita antes de su primer pedido "
+        "según el recorrido de Shopify; cada cliente cuenta una vez y no prueba que el "
+        "anuncio causó la compra. Notas: quién y cuándo, o “nota del cliente en Shopify”. "
+        "— = falta el dato.</p>")
+    return page("Clientes", "/clientes", "".join(body), banner)
 
 
 # --- Fuentes ----------------------------------------------------------------------------------

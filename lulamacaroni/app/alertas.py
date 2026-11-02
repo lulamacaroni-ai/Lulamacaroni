@@ -33,7 +33,8 @@ FUENTE_CONTABLE = "quickbooks"
 @dataclass
 class Alerta:
     nivel: str
-    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido | publicidad
+    area: str            # tienda | pedidos | aprobaciones | fuentes | finanzas | contenido
+                         # | publicidad | clientes
     titulo: str
     detalle: str
     fuente: str
@@ -222,6 +223,21 @@ def publicidad(cs, now: datetime) -> list[Alerta]:
     return out
 
 
+def clientes(cs, fuentes: dict[str, m.EstadoFuente], now: datetime) -> list[Alerta]:
+    """Customer follow-ups whose date has passed (Clientes.seguimiento)."""
+    from .clientes import vencidos
+
+    out = []
+    for c in vencidos(cs):
+        s = c.seguimiento
+        out.append(Alerta(
+            ATENCION, "clientes", f"Seguimiento vencido: {c.nombre}",
+            f"“{s.texto}”, para el {m.dia(datetime.combine(s.para, datetime.min.time(), m.TZ))}.",
+            "Libro de datos (Clientes)", now, "/clientes?f=seguimiento",
+            f"Atiende el seguimiento de {c.nombre}", 12))
+    return out
+
+
 def acciones(alertas: list[Alerta], n: int = 3) -> list[Alerta]:
     """The day's priority actions: the first ``n`` alerts that ask for something."""
     return [a for a in alertas if a.accion and a.nivel != INFO][:n]
@@ -303,6 +319,7 @@ def resumen_dia(d, now: datetime | None = None) -> ResumenDia:
     lista += catalogo_y_contenido(getattr(d, "fichas", []), getattr(d, "piezas", []),
                                   d.fuentes, now)
     lista += publicidad(getattr(d, "campanas_plan", []), now)
+    lista += clientes(getattr(d, "clientes", []), d.fuentes, now)
     lista.sort(key=lambda a: (NIVELES.index(a.nivel), a.prioridad))
     ranuras = [ventas_canal(d.pedidos_rows, d.fuentes, f, c, per) for f, c in CANALES_VENTA]
     ranuras.append(gastos_mes(d.gastos, d.fuentes, now))

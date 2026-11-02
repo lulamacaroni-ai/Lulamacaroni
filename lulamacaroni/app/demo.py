@@ -58,11 +58,17 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
             # Shopify Payments fee (2.9% + 30¢); Prodigi charge once Prodigi has billed it
             "comision_canal": round(price * 0.029 + 0.30, 2),
             **origenes[n - 1001],
+            "cliente_id": ("shopify-cliente-901", "shopify-cliente-902", "",
+                           "shopify-cliente-901", "shopify-cliente-903",
+                           "shopify-cliente-902")[n - 1001],
             **({"pod_pedido_id": f"ord_demo{n}", "costo_pod": 28.0 + 6 * vi, "envio_pod": 7.5}
                if ruta == "prodigi-app" and estado != "recibido" else {}),
         })
     fuentes = [{"fuente": "shopify", "ultima_actualizacion": _iso(now - timedelta(minutes=12)),
                 "estado": "ok", "filas": len(listados) + len(pedidos), "nota": ""},
+               {"fuente": "shopify-clientes",
+                "ultima_actualizacion": _iso(now - timedelta(minutes=12)), "estado": "ok",
+                "filas": 3, "nota": ""},
                {"fuente": "shopify-pagos", "ultima_actualizacion": _iso(now - timedelta(minutes=12)),
                 "estado": "ok", "filas": 2, "nota": ""}]
     pagos = [
@@ -134,7 +140,36 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
          "tope_mensual_usd": 150, "cambio_max_pct": 20, "definido_por": "Lore (ejemplo)",
          "actualizado": _iso(now)},
     ]
-    return {"Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos,
+    hace = lambda d: _iso(now - timedelta(days=d))  # noqa: E731
+    clientes_rows = [  # invented people
+        {"cliente_id": "shopify-cliente-901", "linea": "US-POD", "canal_origen": "shopify",
+         "nombre": "Ana E.", "pais": "US", "region": "CA", "consentimiento_email": "si",
+         "pedidos": 3, "total": 260.0, "moneda": "USD", "ultimo_pedido": hace(0.2),
+         "cliente_desde": hace(40), "ultima_sync": hace(0),
+         "nota": "Pidió el 18x24 enmarcado para regalo (ejemplo).", "nota_por": "Lore",
+         "nota_fecha": hace(3)},
+        {"cliente_id": "shopify-cliente-902", "linea": "US-POD", "canal_origen": "shopify",
+         "nombre": "Ben J.", "pais": "US", "region": "TX", "consentimiento_email": "no",
+         "pedidos": 2, "total": 80.0, "moneda": "USD", "ultimo_pedido": hace(1.5),
+         "cliente_desde": hace(12), "ultima_sync": hace(0),
+         "nota_shopify": "Prefers no gift receipt (example).",
+         "seguimiento": "Confirmar que llegó el reemplazo (ejemplo)",
+         "seguimiento_para": str((now - timedelta(days=2)).date()),
+         "seguimiento_estado": "pendiente"},
+        {"cliente_id": "shopify-cliente-903", "linea": "US-POD", "canal_origen": "shopify",
+         "nombre": "Cleo K.", "pais": "US", "region": "NY", "consentimiento_email": "desconocido",
+         "pedidos": 1, "total": 100.0, "moneda": "USD", "ultimo_pedido": hace(9),
+         "cliente_desde": hace(9), "ultima_sync": hace(0)},
+        {"cliente_id": "mx-001", "linea": "MX-original", "canal_origen": "whatsapp",
+         "nombre": "Daniela R.", "pais": "MX", "region": "CDMX", "pedidos": 1,
+         "total": 14500, "moneda": "MXN", "ultimo_pedido": str((now - timedelta(days=20)).date()),
+         "nota": "Compró el original del puerto; le interesa la serie nueva (ejemplo).",
+         "nota_por": "Lore", "nota_fecha": hace(20),
+         "seguimiento": "Avisarle cuando esté la serie nueva (ejemplo)",
+         "seguimiento_para": str((now + timedelta(days=10)).date()),
+         "seguimiento_estado": "pendiente"},
+    ]
+    return {"Clientes": clientes_rows, "Listados": listados, "Pedidos": pedidos, "Fuentes": fuentes, "Pagos": pagos,
             "Obras": obras, "Variantes": variantes, "Contenido": contenido,
             "Publicidad": publicidad, "Topes": topes_rows}
 

@@ -15,6 +15,8 @@ What it does
 ------------
 * Reads products, variants and inventory into ``Listados`` rows.
 * Reads orders into ``Pedidos`` rows (one per line item), tagged ``US-POD``.
+* Reads customers into ``Clientes`` rows (minimal: short name, country/state, Shopify's
+  order count and total, email consent, the store's note). Only into the workbook.
 * Tags each line with ``ruta_pod``: who fulfils it. The Prodigi and Frame It Easy apps
   already receive Shopify orders on their own, so a line routed to one of them must
   **never** also be sent through the Prodigi API (``connectors/prodigi.py``), or the
@@ -290,6 +292,7 @@ query Orders($first: Int!, $after: String, $query: String) {
       id legacyResourceId name createdAt updatedAt cancelledAt test
       displayFinancialStatus displayFulfillmentStatus
       currencyCode
+      customer { legacyResourceId }
       totalRefundedSet { shopMoney { amount } }
       shippingLine { originalPriceSet { shopMoney { amount } } }
       lineItems(first: 50) {
@@ -545,6 +548,8 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
     refunded = _money(order.get("totalRefundedSet"))
     estado = _order_state(order)
     origin = order_origin(order)
+    cust = (order.get("customer") or {}).get("legacyResourceId")
+    cliente_id = f"shopify-cliente-{cust}" if cust else ""
     fees = split_fee(order_fee(order), [
         _money(li["originalTotalSet"]) - _money(li["totalDiscountSet"]) for li in lines])
     rows = []
@@ -573,6 +578,7 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
             "estado": estado,
             "producto": li.get("name") or "",
             "numero_canal": order.get("name") or "",
+            "cliente_id": cliente_id,
             **origin,
         })
     return rows
@@ -612,6 +618,114 @@ def order_origin(order: dict) -> dict:
         "utm_campana": utm.get("campaign") or "",
         "referente": _domain(visit.get("referrerUrl")),
     }
+
+
+# --- customers (Clientes) -----------------------------------------------------------
+#
+# Only what the back office needs to say who buys, how often and from where: first name
+# and last initial, country and state, Shopify's own order count and total, consent to
+# marketing email and the store's customer note. Never email, phone or street address.
+# Name and address are Shopify "protected customer data": if the app loses that access
+# the fields are dropped and the rest still syncs.
+
+CUSTOMER_FIELDS = (
+    ("base", "id legacyResourceId createdAt updatedAt numberOfOrders "
+             "amountSpent { amount currencyCode } lastOrder { createdAt }"),
+    ("note", "note"),
+    ("emailMarketingConsent", "emailMarketingConsent { marketingState }"),
+    ("firstName", "firstName lastName"),
+    ("defaultAddress", "defaultAddress { countryCodeV2 provinceCode }"),
+)
+
+
+def customers_query(drop: set[str] = frozenset()) -> str:
+    fields = " ".join(f for k, f in CUSTOMER_FIELDS if k not in drop)
+    return ("query Customers($first: Int!, $after: String) { customers(first: $first, "
+            "after: $after, sortKey: UPDATED_AT) { pageInfo { hasNextPage endCursor } "
+            f"nodes {{ {fields} }} }} }}")
+
+
+CONSENT = {"SUBSCRIBED": "si", "NOT_SUBSCRIBED": "no", "UNSUBSCRIBED": "no"}
+
+
+def nombre_corto(first: str | None, last: str | None) -> str:
+    """"Ana G.": enough for Lorena to recognise a buyer, no more."""
+    first = (first or "").strip().split(" ")[0]
+    last = (last or "").strip()
+    return " ".join(x for x in (first, f"{last[0].upper()}." if last else "") if x)
+
+
+def customer_to_row(c: dict, now: str) -> dict:
+    """One ``Clientes`` row. Lorena's own columns (nota, seguimiento...) are never written."""
+    spent = c.get("amountSpent") or {}
+    addr = c.get("defaultAddress") or {}
+    row = {
+        "cliente_id": f"shopify-cliente-{c['legacyResourceId']}",
+        "linea": "US-POD",
+        "canal_origen": "shopify",
+        "pedidos": int(c.get("numberOfOrders") or 0),
+        "total": round(_amount(spent), 2),
+        "moneda": spent.get("currencyCode") or "USD",
+        "ultimo_pedido": (c.get("lastOrder") or {}).get("createdAt") or "",
+        "cliente_desde": c.get("createdAt") or "",
+        "ultima_sync": now,
+    }
+    if "firstName" in c:
+        row["nombre"] = nombre_corto(c.get("firstName"), c.get("lastName"))
+    if "defaultAddress" in c:
+        row["pais"] = addr.get("countryCodeV2") or ""
+        row["region"] = addr.get("provinceCode") or ""
+    if "emailMarketingConsent" in c:
+        state = (c.get("emailMarketingConsent") or {}).get("marketingState") or ""
+        row["consentimiento_email"] = CONSENT.get(state, "desconocido")
+    if "note" in c:
+        row["nota_shopify"] = (c.get("note") or "").strip()[:500]
+    return row
+
+
+def iter_customers(client: "ShopifyClient") -> Iterator[dict]:
+    """Every customer; protected fields Shopify denies are dropped, not fatal."""
+    drop: set[str] = set()
+    optional = [k for k, _ in CUSTOMER_FIELDS if k != "base"]
+    while True:
+        try:
+            yield from client.paginate(customers_query(drop), "customers", page_size=100)
+            return
+        except ShopifyError as e:
+            denied = [k for k in optional if k not in drop and _denied_field(e, k)]
+            if not denied:
+                raise
+            drop.update(denied)
+
+
+def customers_denied(error: ShopifyError) -> bool:
+    return _denied_field(error, "customers")
+
+
+def sync_customers(client: "ShopifyClient", wb) -> int | None:
+    """Upsert Shopify customers into ``Clientes``; None if the app can't read customers.
+
+    Writes only into the workbook (the Google Sheet), never to a file: customer data
+    stays in the sheet.
+    """
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    try:
+        rows = [customer_to_row(c, now) for c in iter_customers(client)]
+    except ShopifyError as e:
+        if not customers_denied(e):
+            raise
+        wb.stamp_source("shopify-clientes", rows=0, estado="sin-conectar",
+                        note="La app de Shopify no tiene el permiso read_customers.")
+        print("Clientes: sin permiso (read_customers); no se sincronizaron.")
+        return None
+    if rows:
+        wb.upsert("Clientes", rows)
+    sin_nombre = sum(1 for r in rows if "nombre" not in r)
+    wb.stamp_source("shopify-clientes", rows=len(rows),
+                    note=("Shopify no dio nombre/dirección (datos protegidos)."
+                          if rows and sin_nombre == len(rows) else ""))
+    print(f"Clientes (Shopify): {len(rows)}")
+    return len(rows)
 
 
 PAYOUT_STATUS = {"SCHEDULED": "programado", "IN_TRANSIT": "en-transito", "PAID": "pagado",
@@ -687,7 +801,14 @@ def main(argv: list[str] | None = None) -> int:
             if not payouts_denied(e):
                 raise
             print(f"Pagos: sin permiso ({PAYOUT_SCOPES})")
-        for row in listings[:3] + orders[:3]:
+        try:  # counts only: customer rows are never printed or written to a file
+            print(f"Clientes: {sum(1 for _ in iter_customers(client))}")
+        except ShopifyError as e:
+            if not customers_denied(e):
+                raise
+            print("Clientes: sin permiso (read_customers)")
+        for row in listings[:3] + [{k: v for k, v in o.items() if k != "cliente_id"}
+                                   for o in orders[:3]]:
             print(json.dumps(row, ensure_ascii=False))
         return 0
     if args.to_json:
@@ -707,6 +828,7 @@ def main(argv: list[str] | None = None) -> int:
     wb.stamp_source("shopify", rows=len(listings) + len(orders),
                     note=f"{len(unrouted)} líneas sin ruta POD clara" if unrouted else "")
     sync_payouts(client, wb)
+    sync_customers(client, wb)
     recalcular(wb)
     return 0
 

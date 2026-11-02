@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from . import alertas as al
 from . import catalogo as cat
+from . import clientes as cli
 from . import contenido as cont
 from . import metrics as m
 from . import publicidad as pub
@@ -41,6 +42,9 @@ class Datos:
         self.faltan_tabs: list[str] = []
         self.publicidad = self._opcional(book, "Publicidad")
         self.topes = self._opcional(book, "Topes")
+        self.clientes_rows = book.read("Clientes")
+        self.clientes = cli.clientes(self.clientes_rows, self.pedidos_rows, self.fuentes,
+                                     self.now)
         self.campanas_plan = pub.campanas(self.publicidad, self.obras, self.approvals,
                                           self.topes, self.pedidos_rows, self.campanas,
                                           self.fuentes, self.now)
@@ -99,6 +103,15 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
             pub.atribucion(d.pedidos_rows, per),
             pub.plan_por_plataforma(d.campanas_plan, pub.topes(d.topes)), per, d.fuentes,
             d.now, banner, d.faltan_tabs)
+    if path == "/clientes":
+        clave = params.get("p", "30")
+        per = m.periodo(clave if clave in m.PERIODOS else "30", d.now)
+        filtro = params.get("f", "todo")
+        filtro = filtro if filtro in cli.FILTROS else "todo"
+        return views.clientes_view(
+            cli.filtrar(d.clientes, filtro),
+            cli.resumen(d.clientes, d.pedidos_rows, d.fuentes, per, d.now),
+            cli.origenes(d.clientes), filtro, per, d.fuentes, d.now, banner)
     if path == "/fuentes":
         return views.fuentes_view(d.fuentes, d.now, banner)
     if path == "/aprobar":

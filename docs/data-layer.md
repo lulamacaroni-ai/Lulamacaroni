@@ -116,6 +116,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `utm_medio` |  |
 | `utm_campana` |  |
 | `referente` |  |
+| `cliente_id` |  |
 
 ### Pagos
 
@@ -171,6 +172,18 @@ One row per: Un cliente o contacto (only what the channel shares and consent all
 | `primer_pedido` |  |
 | `pedidos` |  |
 | `nota` |  |
+| `region` |  |
+| `total` |  |
+| `moneda` |  |
+| `ultimo_pedido` |  |
+| `cliente_desde` |  |
+| `nota_shopify` |  |
+| `nota_por` |  |
+| `nota_fecha` |  |
+| `seguimiento` |  |
+| `seguimiento_para` |  |
+| `seguimiento_estado` | pendiente, hecho, cancelado |
+| `ultima_sync` |  |
 
 ### Contenido
 
