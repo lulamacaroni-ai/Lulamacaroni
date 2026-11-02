@@ -22,10 +22,12 @@ What it does
   manual orders.
 * Writes only drafts, and only with an approved record from the approval gate.
 
-Fulfilment orders need the ``read_merchant_managed_fulfillment_orders`` and
-``read_third_party_fulfillment_orders`` scopes. Without them the orders query falls back
-to routing each line by its variant's stock location, matched against the store's
-fulfilment services (Manual, FIE Fulfillment, Prodigi), which current scopes can read.
+Routing comes from each order's fulfilment orders (the location Shopify assigned), which
+needs the ``read_merchant_managed_fulfillment_orders`` and
+``read_third_party_fulfillment_orders`` scopes; the store's app has had them since
+2026-11-02. If a reinstall ever drops them, the orders query falls back to routing each
+line by its variant's stock location, matched against the store's fulfilment services
+(Manual, FIE Fulfillment, Prodigi).
 
 Scope notes: the app has read orders but not ``read_all_orders``, so Shopify returns
 only the last 60 days of orders. That is fine for a daily sync; history beyond it needs

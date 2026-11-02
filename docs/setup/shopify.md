@@ -1,6 +1,6 @@
 # Setup: Shopify connector
 
-The store has a Dev Dashboard app named **LulaMacaroni Operaciones**. Its scopes are read/write products and inventory, read orders, customers and reports. It uses the client-credentials grant: the connector trades the Client ID and secret for a short-lived Admin API token each run, and never stores the token.
+The store has a Dev Dashboard app named **LulaMacaroni Operaciones**. Its scopes are read/write products and inventory, read orders, customers, reports and locations, plus read merchant-managed and third-party fulfillment orders (added 2026-11-02). It uses the client-credentials grant: the connector trades the Client ID and secret for a short-lived Admin API token each run, and never stores the token.
 
 ## Where the credentials go
 
