@@ -11,8 +11,10 @@ from . import alertas as al
 from . import catalogo as cat
 from . import clientes as cli
 from . import contenido as cont
+from . import finanzas as fin
 from . import metrics as m
 from . import publicidad as pub
+from . import semanal as sem
 from . import views
 
 
@@ -30,6 +32,7 @@ class Datos:
         self.contenido = book.read("Contenido")
         self.pagos = book.read("Pagos")
         self.gastos = book.read("Gastos")
+        self.decisiones = book.read("Decisiones")
         self.fuentes_rows = book.read("Fuentes")
         self.fuentes = m.estado_fuentes(self.fuentes_rows, self.now)
         self.approvals = store.all()
@@ -112,6 +115,13 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
             cli.filtrar(d.clientes, filtro),
             cli.resumen(d.clientes, d.pedidos_rows, d.fuentes, per, d.now),
             cli.origenes(d.clientes), filtro, per, d.fuentes, d.now, banner)
+    if path == "/finanzas":
+        clave = params.get("p", "mes")
+        clave = clave if clave in dict(fin.PERIODOS) else "mes"
+        return fin.render(fin.calcular(d, clave), d.fuentes, d.now, banner)
+    if path == "/semana":
+        clave = "actual" if params.get("s") == "actual" else "pasada"
+        return sem.render(sem.calcular(d, clave), d.now, banner)
     if path == "/fuentes":
         return views.fuentes_view(d.fuentes, d.now, banner)
     if path == "/aprobar":
