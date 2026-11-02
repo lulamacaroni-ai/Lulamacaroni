@@ -33,7 +33,7 @@ class FuenteInfo:
 FUENTES = (
     FuenteInfo("shopify", "Shopify", "API", 26, "conectada"),
     FuenteInfo("etsy", "Etsy", "API", 26, "siguiente conector"),
-    FuenteInfo("prodigi", "Prodigi", "API", 26, "falta la llave de sandbox"),
+    FuenteInfo("prodigi", "Prodigi", "API", 26, ""),  # text from prodigi_fase()
     FuenteInfo("quickbooks", "QuickBooks", "API", 48, "cuando exista la cuenta"),
     FuenteInfo("meta", "Meta Ads", "API", 26, "requiere revisión de app de Meta"),
     FuenteInfo("instagram", "Instagram", "API", 26, "requiere revisión de app de Meta"),
@@ -68,13 +68,27 @@ def parse_dt(value) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def prodigi_fase() -> str:
+    """What Prodigi still needs, read from the same settings the connector uses."""
+    from ..connectors.prodigi import KEY_VARS
+
+    env = config.get("PRODIGI_ENV", "sandbox")
+    var = KEY_VARS.get(env)
+    if var is None:
+        return f"PRODIGI_ENV no válido ({env})"
+    if not config.get(var):
+        return f"falta la llave de {env}"
+    return f"llave de {env} lista; aún sin sincronizar costos"
+
+
 def estado_fuentes(fuentes_rows: list[dict], now: datetime) -> dict[str, EstadoFuente]:
     by_key = {r.get("fuente"): r for r in fuentes_rows}
     out = {}
     for info in FUENTES:
         row = by_key.get(info.clave)
         if not row:
-            out[info.clave] = EstadoFuente(info, "sin-conectar", None, nota=info.fase)
+            fase = prodigi_fase() if info.clave == "prodigi" else info.fase
+            out[info.clave] = EstadoFuente(info, "sin-conectar", None, nota=fase)
             continue
         when = parse_dt(row.get("ultima_actualizacion"))
         estado = row.get("estado") or "ok"

@@ -152,3 +152,17 @@ def test_screens_escape_store_text(tmp_path, store):
                            "titulo_en_canal": "<script>x</script>", "estado": "publicado"}])
     html = render("/catalogo", {}, Datos(b, store, NOW))
     assert "<script>x" not in html and "&lt;script&gt;" in html
+
+
+def test_prodigi_source_reads_the_key_like_the_connector(monkeypatch):
+    from lulamacaroni.app.metrics import estado_fuentes
+
+    now = datetime.now(timezone.utc)
+    monkeypatch.delenv("PRODIGI_ENV", raising=False)
+    monkeypatch.setenv("PRODIGI_SANDBOX_API_KEY", "x")
+    assert "lista" in estado_fuentes([], now)["prodigi"].nota
+    monkeypatch.delenv("PRODIGI_SANDBOX_API_KEY")
+    assert estado_fuentes([], now)["prodigi"].nota == "falta la llave de sandbox"
+    monkeypatch.setenv("PRODIGI_ENV", "live")
+    monkeypatch.setenv("PRODIGI_API_KEY", "y")
+    assert estado_fuentes([], now)["prodigi"].nota == "llave de live lista; aún sin sincronizar costos"
