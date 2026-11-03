@@ -82,20 +82,20 @@ PERRITO_JS = Path(__file__).with_name("static") / "perrito.js"  # its animation,
 
 
 def es_portada(path: str, params: dict[str, str]) -> bool:
-    """The bare root is the welcome page; ``/?p=`` (old Inicio links) still opens Inicio."""
+    """The bare root opens with the welcome art; ``/?p=`` (old Inicio links) opens plain Inicio."""
     return path == "/" and "p" not in params
 
 
 def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str | None:
     """HTML for ``path``, or None if there is no such screen."""
-    if es_portada(path, params):
-        return views.portada(PORTADA.is_file(), banner)
     if path in ("/", "/inicio"):
         clave = params.get("p", "7")
         clave = clave if clave in m.PERIODOS else "7"
         res = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, m.periodo(clave, d.now),
                         d.pagos)
-        return views.inicio(res, al.resumen_dia(d), d.fuentes, d.now, banner=banner)
+        html = views.inicio(res, al.resumen_dia(d), d.fuentes, d.now, banner=banner)
+        # the bare address is the front door: Inicio with the welcome art fading away over it
+        return views.con_portada(html, PORTADA.is_file(), banner) if es_portada(path, params) else html
     if path == "/alertas":
         return views.alertas_view(al.resumen_dia(d).alertas, d.fuentes, d.now, banner)
     if path == "/pedidos":

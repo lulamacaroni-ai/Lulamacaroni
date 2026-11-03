@@ -105,11 +105,11 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
-        if es_portada(url.path, params):  # no workbook read: the welcome page opens at once
-            return self._send(200, views.portada(PORTADA.is_file(), self.banner))
         try:
             html = render(url.path, params, Datos(self.book, self.store), self.banner)
         except Exception as exc:  # show a readable error instead of a dropped connection
+            if es_portada(url.path, params):  # the front door still opens with the art
+                return self._send(200, views.portada(PORTADA.is_file(), self.banner))
             return self._send(500, f"No se pudo leer el libro de datos: {type(exc).__name__}", TEXT)
         if html is None:
             return self._send(404, "No encontrado", TEXT)
