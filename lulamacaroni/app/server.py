@@ -29,11 +29,12 @@ from ..approval.store import JsonStore, SheetsStore, open_store
 from ..localbook import LocalWorkbook, open_workbook
 from ..workbook import Workbook
 from . import views
-from .screens import PERRITO, PORTADA, Datos, es_portada, render
+from .screens import PERRITO, PERRITO_JS, PORTADA, Datos, es_portada, render
 
 APPROVER = config.get("LULA_APPROVER", "Lorena")
 TEXT = "text/plain; charset=utf-8"
 IMAGENES = {"/portada.png": PORTADA, "/perrito.png": PERRITO}
+ESTATICOS = {"/perrito.js": (PERRITO_JS, "text/javascript; charset=utf-8")}
 
 
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
@@ -89,13 +90,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         url = urlparse(self.path)
         params = {k: v[0] for k, v in parse_qs(url.query).items()}
-        if url.path in IMAGENES:  # Lore's art, served as-is
-            archivo = IMAGENES[url.path]
+        if url.path in IMAGENES or url.path in ESTATICOS:  # Lore's art and the puppy's script
+            archivo, tipo = ESTATICOS.get(url.path) or (IMAGENES[url.path], "image/png")
             if not archivo.is_file():
                 return self._send(404, "No encontrado", TEXT)
             data = archivo.read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Type", tipo)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "private, max-age=86400")
             self.end_headers()
