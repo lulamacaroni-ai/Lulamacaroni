@@ -184,10 +184,10 @@ def test_puppy_plays_now_and_then_on_screens_but_not_on_the_welcome_page(book, s
 
     d = Datos(book, store)
     inicio = render("/inicio", {}, d)
-    assert "/perrito.png" in inicio and "lula-perrito" in inicio
+    assert "/perrito.js" in inicio and "lula-perrito" in inicio
     assert "prefers-reduced-motion" in inicio  # no motion for people who turn it off
     assert "perrito=1" in inicio  # a way to see it on demand
-    assert "/perrito.png" not in views.portada(True)  # never on the welcome page
+    assert "perrito" not in views.portada(True)  # never on the welcome page
     assert "pointer-events:none" in views.CSS  # it never blocks a click
     assert 0 < views.PERRITO_PROBABILIDAD < 1 and views.PERRITO_CADA_MIN >= 5
 
@@ -202,7 +202,23 @@ def test_puppy_art_is_cut_out_but_never_stretched():
     assert im.mode == "RGBA"  # background removed
     # same proportions as the trimmed artwork (1246×1136): resized evenly, never stretched
     assert abs(im.width / im.height - 1246 / 1136) < 0.01
-    assert "1136/1246" in views.PERRITO_JS  # drawn at the same proportions
+    from lulamacaroni.app.screens import PERRITO_JS
+
+    js = PERRITO_JS.read_text(encoding="utf-8")
+    assert "1136 / 1246" in js and 'preserveAspectRatio: "xMidYMid meet"' in js  # never stretched
+    assert "/perrito.js" in views.PERRITO_JS  # the animation loads only when it plays
+
+
+def test_running_dog_follows_a_real_gait():
+    from lulamacaroni.app import views
+    from lulamacaroni.app.screens import PERRITO_JS
+
+    js = PERRITO_JS.read_text(encoding="utf-8")
+    # trot (diagonal pairs) into a rotary gallop, planted paws matched to ground speed,
+    # a roll that turns by distance travelled, and a safety net that removes the dog
+    for clave in ("TROTE", "GALOPE", "apoyo", "sweep = clamp((v / u)", "dx / radio", "c.remove()"):
+        assert clave in js
+    assert "pointer-events:none" in views.CSS
 
 
 # --- details of Lore's paintings on every screen --------------------------------------------
