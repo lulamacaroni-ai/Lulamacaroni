@@ -135,6 +135,9 @@ main{max-width:1120px;margin:0 auto;padding:28px 32px 56px}
  main{padding:18px 16px 40px}
 }
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
+html.entrada .layout{animation:entra .7s ease both}
+@keyframes entra{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){html.entrada .layout{animation:none}}
 
 /* --- type ----------------------------------------------------------------------------- */
 h1{font-family:"DM Sans",system-ui,sans-serif;font-size:1.85rem;line-height:1.15;
@@ -407,7 +410,9 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
         "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>"
         "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=DM+Sans:"
         "ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap'>"
-        f"<title>{escape(titulo)} · Lula Macaroni</title><style>{CSS}</style></head>"
+        f"<title>{escape(titulo)} · Lula Macaroni</title><style>{CSS}</style>"
+        "<script>try{if(sessionStorage.getItem('lula-entrada')){sessionStorage.removeItem('lula-entrada');"
+        "document.documentElement.classList.add('entrada')}}catch(e){}</script></head>"
         "<body><div class='layout'>"
         "<input type='checkbox' id='menu' aria-label='Abrir menú'>"
         f"<header class='top'><label for='menu' class='burger' title='Menú'>{icono('menu')}</label>"
@@ -445,7 +450,17 @@ box-shadow:0 4px 14px rgba(158,27,34,.28);min-height:48px}
 .portada .entrar:hover{filter:brightness(1.08)}
 .portada .entrar:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 @media (prefers-color-scheme:dark){.portada .entrar{color:#1C1C1E}}
+/* the welcome page fades out on its own, then Inicio fades in */
+.portada{transition:opacity .9s ease}
+body.salir .portada{opacity:0}
+.portada img{animation:aparece .8s ease both}
+@keyframes aparece{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.portada,.portada img{transition:none;animation:none}}
 """
+
+# Seconds the welcome art stays before fading into Inicio; a tap or key skips it.
+PORTADA_ESPERA_MS = 2600
+PORTADA_FUNDIDO_MS = 900
 
 
 def portada(con_imagen: bool, banner: str = "") -> str:
@@ -462,7 +477,16 @@ def portada(con_imagen: bool, banner: str = "") -> str:
         f"<title>Bienvenida · Lula Macaroni</title><style>{PORTADA_CSS}</style></head>"
         f"<body><main class='portada'>{ban}{img}"
         "<p class='marca'>Lula Macaroni<small>Oficina del estudio</small></p>"
-        "<a class='entrar' href='/inicio'>Entrar →</a></main></body></html>"
+        "<a class='entrar' href='/inicio'>Entrar →</a></main>"
+        "<script>(function(){var ido=false;function ir(){if(ido)return;ido=true;"
+        "try{sessionStorage.setItem('lula-entrada','1')}catch(e){}"
+        "var quieto=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;"
+        "document.body.classList.add('salir');"
+        f"setTimeout(function(){{location.replace('/inicio')}},quieto?0:{PORTADA_FUNDIDO_MS});}}"
+        f"setTimeout(ir,{PORTADA_ESPERA_MS});"
+        "document.addEventListener('click',function(e){e.preventDefault();ir()});"
+        "document.addEventListener('keydown',ir);})();</script>"
+        "</body></html>"
     )
 
 
