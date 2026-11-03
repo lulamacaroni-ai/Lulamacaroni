@@ -29,11 +29,12 @@ from ..approval.store import JsonStore, SheetsStore, open_store
 from ..localbook import LocalWorkbook, open_workbook
 from ..workbook import Workbook
 from . import views
+from .arte import ARCHIVOS as ARTE
 from .screens import PERRITO, PERRITO_JS, PORTADA, Datos, es_portada, render
 
 APPROVER = config.get("LULA_APPROVER", "Lorena")
 TEXT = "text/plain; charset=utf-8"
-IMAGENES = {"/portada.png": PORTADA, "/perrito.png": PERRITO}
+IMAGENES = {"/portada.png": PORTADA, "/perrito.png": PERRITO, **ARTE}
 ESTATICOS = {"/perrito.js": (PERRITO_JS, "text/javascript; charset=utf-8")}
 
 
@@ -92,6 +93,8 @@ class Handler(BaseHTTPRequestHandler):
         params = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path in IMAGENES or url.path in ESTATICOS:  # Lore's art and the puppy's script
             archivo, tipo = ESTATICOS.get(url.path) or (IMAGENES[url.path], "image/png")
+            if archivo.suffix == ".jpg":
+                tipo = "image/jpeg"
             if not archivo.is_file():
                 return self._send(404, "No encontrado", TEXT)
             data = archivo.read_bytes()
