@@ -169,3 +169,12 @@ def test_root_is_the_welcome_page_with_a_way_in(book, store):
     # the art is never cropped or stretched, and the page still works without it
     assert "object-fit:contain" in views.PORTADA_CSS and "width:auto;height:auto" in views.PORTADA_CSS
     assert "<img" in views.portada(True) and "<img" not in views.portada(False)
+
+
+def test_welcome_page_fades_into_inicio():
+    from lulamacaroni.app import views
+
+    html = views.portada(True)
+    assert "location.replace('/inicio')" in html and "classList.add('salir')" in html
+    assert "prefers-reduced-motion" in html  # no motion for people who turn it off
+    assert "href='/inicio'" in html  # still works without JavaScript
