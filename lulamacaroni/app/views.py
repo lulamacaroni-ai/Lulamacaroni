@@ -6,10 +6,12 @@ colors come from Lore's artwork in the store; DM Sans, the storefront's font.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from html import escape
 
 from ..approval.page import render_cards
+from . import arte
 from .metrics import MESES, TZ, Dato, EstadoFuente, Pedido, Producto, Resumen
 
 CANAL = {"shopify": "Shopify", "etsy": "Etsy", "sitio-mx": "Sitio MX", "whatsapp": "WhatsApp",
@@ -227,9 +229,53 @@ display:flex;align-items:center;justify-content:center;overflow:hidden;color:var
 font-size:.65rem;text-align:center;line-height:1.1}
 .ph img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
 .ph.sm{width:52px;height:52px}
-.ph.hero{width:100%;height:auto;min-height:120px;max-height:440px;padding:8px}
-.ph.hero img{max-height:424px}
-.gal{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.ph.md{width:96px;height:96px;padding:4px}
+.gal{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+
+/* --- Catálogo: the art first, large and whole (scaled to fit, never cropped) -------------- */
+.galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:18px;
+margin:14px 0}
+.pieza{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:0}
+.pieza.alert{border-color:color-mix(in srgb,var(--warn) 35%,var(--line));box-shadow:inset 0 4px 0 var(--warn)}
+.pieza .foto{display:block}
+.ph.xl{width:100%;height:auto;aspect-ratio:1/1;border-radius:0;padding:22px;font-size:.9rem;
+background:color-mix(in srgb,var(--pergamino) 45%,var(--card))}
+.ph.xl img{max-height:100%;filter:drop-shadow(0 6px 14px rgba(43,26,18,.22))}
+.pieza .foto:hover .ph.xl img{transform:scale(1.015)}
+.ph.xl img{transition:transform .25s ease}
+@media (prefers-reduced-motion:reduce){.ph.xl img{transition:none}}
+.pieza .info{padding:14px 16px 16px;display:flex;flex-direction:column;gap:3px}
+.pieza .info .t{font-size:1.08rem}
+.pieza.alert .info{background:var(--warn-bg)}
+@media (prefers-color-scheme:dark){.ph.xl{background:#2A2219}}
+
+/* --- product page: a large cover, whole ----------------------------------------------------- */
+.cubierta{margin:16px 0 8px}
+.ph.cover{width:100%;height:min(82vh,820px);padding:20px;border-radius:var(--r);font-size:.95rem;
+background:color-mix(in srgb,var(--pergamino) 45%,var(--card));border:1px solid var(--line)}
+.ph.cover img{max-height:100%;filter:drop-shadow(0 8px 20px rgba(43,26,18,.25))}
+@media (prefers-color-scheme:dark){.ph.cover{background:#2A2219}}
+@media (max-width:600px){.ph.cover{height:auto;aspect-ratio:1/1;padding:10px}.ph.xl{padding:14px}}
+
+/* --- details of Lore's paintings: one per screen, a row of stamps at the foot ---------------- */
+.cab{display:flex;align-items:flex-start;justify-content:space-between;gap:28px;margin-bottom:10px}
+.cab-t{flex:1;min-width:0}
+.obra{flex:none;margin:0;width:118px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.obra img{display:block;width:118px;height:148px;border-radius:999px 999px 12px 12px;
+border:4px solid var(--card);box-shadow:0 2px 4px rgba(43,26,18,.12),0 8px 22px rgba(43,26,18,.14)}
+.obra figcaption{font-size:.68rem;line-height:1.3;color:var(--muted);text-align:center}
+@media (max-width:600px){.cab{gap:14px;align-items:flex-start}.obra{width:78px}
+ .obra img{width:78px;height:98px;border-width:3px}.obra figcaption{display:none}}
+.sellos{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:44px 0 0;padding-top:22px;
+border-top:1px solid var(--line)}
+.sellos img{display:block;width:40px;height:40px;border-radius:50%;border:2px solid var(--card);
+box-shadow:0 1px 4px rgba(43,26,18,.18);opacity:.92}
+.empty::before{content:"";display:block;width:56px;height:56px;margin:0 auto 10px;border-radius:50%;
+background:var(--motivo) center/contain no-repeat;box-shadow:0 1px 4px rgba(43,26,18,.18)}
+.card.info{position:relative;padding-left:68px;min-height:64px}
+.card.info::before{content:"";position:absolute;left:16px;top:14px;width:38px;height:38px;
+border-radius:50%;background:var(--motivo) center/contain no-repeat;opacity:.95}
 .desc p{margin:6px 0}
 
 /* --- the puppy (Lore's art, cut out of its background, never cropped or stretched) ------ */
@@ -340,7 +386,22 @@ PERRITO_JS = (
 )
 
 
-def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
+# A screen's heading: an optional kicker line, the <h1>, and the line under it.
+_CABECERA = re.compile(r"""^((?:<p class=["']sub["']>.*?</p>)?<h1>.*?</h1>"""
+                       r"""(?:<p class=["'](?:sub|meta)["']>.*?</p>)?)""", re.S)
+
+
+def _con_arte(body: str, activo: str) -> str:
+    """Put the screen's art detail beside its heading, without touching the data below."""
+    deco = arte.detalle(activo)
+    m = _CABECERA.match(body)
+    if not deco or not m:
+        return body
+    return (f'<header class="cab"><div class="cab-t">{m.group(1)}</div>{deco}</header>'
+            + body[m.end():])
+
+
+def page(titulo: str, activo: str, body: str, banner: str = "", decorar: bool = True) -> str:
     grupos = []
     aqui = ""
     for grupo, items in NAV_GRUPOS:
@@ -374,7 +435,8 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
         f"{marca}<nav aria-label='Menú principal'>{''.join(grupos)}</nav>"
         "<div class='foot'>Solo lectura · lo que se publica o gasta pasa por Aprobar.</div></aside>"
         "<label for='menu' class='veil' aria-hidden='true'></label>"
-        f"<div class='content'><main>{ban}{body}</main></div>"
+        f"<div class='content'><main style='--motivo:url({arte.motivo(activo)})'>{ban}"
+        f"{_con_arte(body, activo) if decorar else body}{arte.sellos()}</main></div>"
         f"</div><script>{PERRITO_JS}</script></body></html>"
     )
 
@@ -490,8 +552,8 @@ def inicio(res: Resumen, rd, fuentes: dict[str, EstadoFuente], now: datetime,
         + (f'<a href="/alertas" class="badge amber">{ate} aviso(s)</a>' if ate else "")
         or '<span class="badge ok">Nada pendiente</span>')
     body = (
-        f'<div class="row"><div><p class="sub">Resumen del día · {fecha(now, hora=False)}</p>'
-        f"<h1>Hola, {escape(nombre)}</h1></div></div>"
+        f'<p class="sub">Resumen del día · {fecha(now, hora=False)}</p>'
+        f"<h1>Hola, {escape(nombre)}</h1>"
         f'<div class="card summary"><p><strong>Qué pasó:</strong> {escape(rd.que_paso)}</p>'
         f'<p><strong>Qué requiere tu atención:</strong></p><div class="counts">{counts}'
         '<a href="/alertas" class="chip">Ver alertas</a></div>'
@@ -654,24 +716,27 @@ def catalogo(fichas: list, originales: list, datos: list[Dato], filtro: str, fue
         "ocultos": [f for f in fichas if f.producto.estado in ("pausado", "borrador")],
         "mx": [],
     }.get(filtro, fichas)
-    rows = []
+    piezas = []
     for f in sel:
         p = f.producto
         avisos = _ficha_avisos(f)
         link = f"/catalogo/producto?c={escape(p.canal)}&amp;id={escape(p.id_producto)}"
         obra = (f" · obra {escape(f.obras[0].get('obra_id', ''))}" if f.obras
                 else " · sin ligar a una obra")
-        rows.append(
-            f'<div class="card{" alert" if avisos else ""}"><div class="row"><div class="pr">'
-            f'<a href="{link}" aria-hidden="true" tabindex="-1">{imagen(p.imagen, p.titulo)}</a>'
-            f'<div><div class="t"><a href="{link}">{escape(p.titulo)}</a></div>'
+        piezas.append(
+            f'<article class="pieza{" alert" if avisos else ""}">'
+            f'<a class="foto" href="{link}" aria-hidden="true" tabindex="-1">'
+            f'{imagen(p.imagen, p.titulo, "xl", 800)}</a><div class="info">'
+            f'<div class="row"><div class="t"><a href="{link}">{escape(p.titulo)}</a></div>'
+            f'<span class="badge {badge.get(p.estado, "gray")}">'
+            f"{escape(ESTADO_LISTADO.get(p.estado, p.estado))}</span></div>"
             f'<div class="m"><span class="tag">{escape(LINEA.get(p.linea, p.linea))}</span>'
             f"{escape(CANAL.get(p.canal, p.canal))} · {p.variantes} variante(s) · {_precio(p)}</div>"
             f'<div class="m">Imprime: {escape(_rutas(p.rutas))} · coste en {f.con_costo} de '
             f"{p.variantes} · archivo sin revisar en {f.archivos_sin}{obra}</div>"
             + "".join(f'<div class="m w">{escape(a)}</div>' for a in avisos)
-            + f'</div></div><span class="badge {badge.get(p.estado, "gray")}">'
-            f"{escape(ESTADO_LISTADO.get(p.estado, p.estado))}</span></div></div>")
+            + "</div></article>")
+    rows = [f'<div class="galeria">{"".join(piezas)}</div>'] if piezas else []
     if filtro in ("todo", "mx"):
         rows.append("<h2>Originales México</h2>")
         if not originales:
@@ -725,18 +790,24 @@ def _contenido_producto(p, actualizado: datetime | None) -> str:
         return ('<h2>En la tienda</h2><div class="card info"><div class="m">Aún no hay imagen ni '
                 "descripción en la hoja: llegan con la próxima sincronización de Shopify."
                 "</div></div>")
-    portada = imagen(p.imagen, p.titulo, "hero", 900)
-    galeria = "".join(
-        f'<a href="{escape(u)}" target="_blank" rel="noopener">'
-        f'{imagen(u, f"{p.titulo}, imagen {i}", "sm", 160)}</a>'
-        for i, u in enumerate(p.imagenes, 1)) if len(p.imagenes) > 1 else ""
     desc = (f'<div class="desc">{_parrafos(p.descripcion)}</div>' if p.descripcion
             else '<p class="m">Sin descripción en Shopify.</p>')
     return (
-        f'<h2>En la tienda</h2><div class="card">{portada}'
-        + (f'<div class="gal">{galeria}</div>' if galeria else "")
-        + f'{desc}<p class="m">Tipo: {escape(p.tipo or "—")} · Etiquetas: '
+        f'<h2>En la tienda</h2><div class="card">'
+        f'{desc}<p class="m">Tipo: {escape(p.tipo or "—")} · Etiquetas: '
         f'{escape(p.etiquetas or "sin etiquetas en Shopify")}</p>{origen}</div>')
+
+
+def _portada_producto(p) -> str:
+    """The product's main image, large and whole, with the rest of its images below."""
+    if not p.imagenes:
+        return ""
+    galeria = "".join(
+        f'<a href="{escape(u)}" target="_blank" rel="noopener">'
+        f'{imagen(u, f"{p.titulo}, imagen {i}", "md", 320)}</a>'
+        for i, u in enumerate(p.imagenes, 1)) if len(p.imagenes) > 1 else ""
+    return (f'<section class="cubierta">{imagen(p.imagen, p.titulo, "cover", 1600)}'
+            + (f'<div class="gal">{galeria}</div>' if galeria else "") + "</section>")
 
 
 def producto(f, fuentes, now: datetime, banner: str = "") -> str:
@@ -777,7 +848,7 @@ def producto(f, fuentes, now: datetime, banner: str = "") -> str:
         f'<p class="sub">{escape(LINEA.get(p.linea, p.linea))} · {escape(CANAL.get(p.canal, p.canal))}'
         f" · {escape(ESTADO_LISTADO.get(p.estado, p.estado))}{tienda}. "
         f"Shopify actualizado {fecha(shop.actualizado)} ({hace(shop.actualizado, now)}).</p>"
-        f"{avisos}{contenido}<h2>Obra</h2>{obras}<h2>Variantes ({len(f.variantes)})</h2>"
+        f"{_portada_producto(p)}{avisos}{contenido}<h2>Obra</h2>{obras}<h2>Variantes ({len(f.variantes)})</h2>"
         f"{''.join(rows)}"
         '<p class="legend">Precio e imprenta: Shopify (ubicación de inventario de cada variante). '
         "Coste: cotización en Variantes.costo_usd (impresión + envío a EUA), estimado. Margen "
@@ -786,7 +857,7 @@ def producto(f, fuentes, now: datetime, banner: str = "") -> str:
         "resolución y proporción del archivo de impresión para el tamaño; nunca se recorta ni "
         "se estira. “—” = falta el dato.</p>"
     )
-    return page(p.titulo, "/catalogo", body, banner)
+    return page(p.titulo, "/catalogo", body, banner, decorar=False)
 
 
 # --- Contenido --------------------------------------------------------------------------------

@@ -219,3 +219,48 @@ def test_running_dog_follows_a_real_gait():
     for clave in ("TROTE", "GALOPE", "apoyo", "sweep = clamp((v / u)", "dx / radio", "c.remove()"):
         assert clave in js
     assert "pointer-events:none" in views.CSS
+
+
+# --- details of Lore's paintings on every screen --------------------------------------------
+
+def test_every_screen_has_its_own_painting_detail(book, store):
+    from lulamacaroni.app import arte
+    from lulamacaroni.app.views import NAV
+
+    d = Datos(book, store, NOW)
+    vistos = set()
+    for path, _ in NAV:
+        html = render(path, {}, d)
+        nombre = arte.PANTALLAS[path][0]
+        assert 'class="cab"' in html and f"/arte/{nombre}.jpg" in html, path
+        assert "Detalle de <i>" in html and 'class="sellos"' in html, path
+        assert html.index('class="cab"') < html.index("<h1>")  # beside the title, above the data
+        vistos.add(nombre)
+    assert len(vistos) == len(NAV)  # a different detail on each screen
+
+
+def test_painting_details_are_small_and_never_stretched():
+    from PIL import Image
+
+    from lulamacaroni.app import arte
+
+    total = 0
+    for ruta, archivo in arte.ARCHIVOS.items():
+        assert archivo.is_file(), ruta
+        total += archivo.stat().st_size
+        w, h = Image.open(archivo).size
+        sello = archivo.name.startswith("sello-")
+        assert (w, h) == ((120, 120) if sello else (320, 400)), ruta
+    assert total < 400_000  # the whole set stays light
+    # every stamp is a painting in the store, and every detail names its painting
+    assert len([r for r in arte.ARCHIVOS if "/sello-" in r]) == len(arte.OBRAS) == 10
+
+
+def test_product_page_keeps_the_cover_as_the_only_art(book, store):
+    d = Datos(book, store, NOW)
+    cat = render("/catalogo", {}, d)
+    assert 'class="galeria"' in cat and 'class="ph xl"' in cat
+    link = cat.split('class="t"><a href="', 1)[1].split('"', 1)[0].replace("&amp;", "&")
+    params = dict(kv.split("=") for kv in link.split("?", 1)[1].split("&"))
+    det = render("/catalogo/producto", params, d)
+    assert 'class="obra"' not in det and 'class="sellos"' in det

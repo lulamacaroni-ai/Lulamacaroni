@@ -56,3 +56,10 @@ def test_post_needs_the_password_too(running):
 def test_refuses_to_listen_publicly_without_a_password(monkeypatch):
     monkeypatch.delenv("LULA_APP_PASSWORD", raising=False)
     assert srv.main(["--host", "0.0.0.0", "--port", "0", "--demo"]) == 2
+
+
+def test_painting_details_are_served_and_nothing_else_from_the_folder(running):
+    status, headers = _get(running + "/arte/catalogo.jpg", "s3creta-ñ")
+    assert status == 200 and headers["Content-Type"] == "image/jpeg"
+    assert _get(running + "/arte/catalogo.jpg")[0] == 401
+    assert _get(running + "/arte/../screens.py", "s3creta-ñ")[0] == 404
