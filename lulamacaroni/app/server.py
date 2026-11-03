@@ -92,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=int(config.get("LULA_APP_PORT", "8770")))
     parser.add_argument("--demo", action="store_true",
                         help="sample data in a temporary folder; nothing real is read or written")
+    parser.add_argument("--open", action="store_true",
+                        help="open the app in the default browser once it is listening")
     args = parser.parse_args(argv)
 
     if args.demo:
@@ -111,7 +113,13 @@ def main(argv: list[str] | None = None) -> int:
         Handler.store = (SheetsStore(Handler.book) if isinstance(Handler.book, Workbook)
                          else open_store())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Back office en http://127.0.0.1:{args.port}  (Ctrl+C para salir)")
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"Back office en {url}  (Ctrl+C para salir)")
+    if args.open:
+        import threading
+        import webbrowser
+
+        threading.Timer(0.5, webbrowser.open, [url]).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
