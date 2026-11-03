@@ -158,26 +158,33 @@ def test_prodigi_source_reads_the_key_like_the_connector(monkeypatch):
     assert estado_fuentes([], now)["prodigi"].nota == "llave de live lista; aún sin sincronizar costos"
 
 
-def test_root_is_the_welcome_page_with_a_way_in(book, store):
+def test_root_is_inicio_with_the_welcome_art_over_it(book, store):
     from lulamacaroni.app import views
 
     html = render("/", {}, Datos(book, store, NOW), banner="Datos de ejemplo")
-    assert "href='/inicio'" in html and "Entrar" in html and "Datos de ejemplo" in html
-    assert "/inicio?p=" not in html  # it is not Inicio itself
-    # old Inicio links (/?p=30) still open Inicio
-    assert "Hola, Lore" in render("/", {"p": "30"}, Datos(book, store, NOW))
+    # Inicio is already underneath, so nothing has to load when the art fades away
+    assert "Hola, Lore" in html and "id='portada'" in html and "Datos de ejemplo" in html
+    assert html.index("id='portada'") < html.index("Hola, Lore")
+    assert "href='/inicio'" in html and "Entrar" in html  # works without JavaScript too
+    # /inicio and old /?p= links open plain Inicio
+    assert "id='portada'" not in render("/inicio", {}, Datos(book, store, NOW))
+    assert "id='portada'" not in render("/", {"p": "30"}, Datos(book, store, NOW))
+    # the logo in the menu goes back to the front door
+    assert 'class="brand" href="/"' in html
     # the art is never cropped or stretched, and the page still works without it
     assert "object-fit:contain" in views.PORTADA_CSS and "width:auto;height:auto" in views.PORTADA_CSS
     assert "<img" in views.portada(True) and "<img" not in views.portada(False)
 
 
-def test_welcome_page_fades_into_inicio():
+def test_welcome_art_fades_away_every_time(book, store):
     from lulamacaroni.app import views
 
-    html = views.portada(True)
-    assert "location.replace('/inicio')" in html and "classList.add('salir')" in html
-    assert "prefers-reduced-motion" in html  # no motion for people who turn it off
-    assert "href='/inicio'" in html  # still works without JavaScript
+    html = render("/", {}, Datos(book, store, NOW))
+    assert "classList.add('fuera')" in html and f"setTimeout(quita,{views.PORTADA_ESPERA_MS})" in html
+    assert "sessionStorage" not in html  # no once-per-visit memory that could hide it
+    # reduce motion keeps the plain fade and only drops the zoom
+    assert "@media (prefers-reduced-motion:reduce){.portada img{animation:none}}" in views.PORTADA_CSS
+
 
 def test_puppy_plays_now_and_then_on_screens_but_not_on_the_welcome_page(book, store):
     from lulamacaroni.app import views

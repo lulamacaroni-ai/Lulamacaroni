@@ -137,9 +137,6 @@ main{max-width:1120px;margin:0 auto;padding:28px 32px 56px}
  main{padding:18px 16px 40px}
 }
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
-html.entrada .layout{animation:entra .7s ease both}
-@keyframes entra{from{opacity:0}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){html.entrada .layout{animation:none}}
 
 /* --- type ----------------------------------------------------------------------------- */
 h1{font-family:"DM Sans",system-ui,sans-serif;font-size:1.85rem;line-height:1.15;
@@ -410,7 +407,7 @@ def page(titulo: str, activo: str, body: str, banner: str = "", decorar: bool = 
             links.append(f'<a href="{h}"{cur}>{icono(ico)}<span>{escape(t)}</span></a>')
         grupos.append(f'<div class="grp">{escape(grupo)}</div>{"".join(links)}')
     ban = f'<div class="banner">{escape(banner)}</div>' if banner else ""
-    marca = ('<a class="brand" href="/inicio"><span class="mark">LM</span>'
+    marca = ('<a class="brand" href="/" title="Ver la portada"><span class="mark">LM</span>'
              '<span class="name">Lula Macaroni<small>Oficina</small></span></a>')
     return (
         "<!doctype html><html lang='es-MX'><head><meta charset='utf-8'>"
@@ -420,9 +417,7 @@ def page(titulo: str, activo: str, body: str, banner: str = "", decorar: bool = 
         "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>"
         "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=DM+Sans:"
         "ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap'>"
-        f"<title>{escape(titulo)} · Lula Macaroni</title><style>{CSS}</style>"
-        "<script>try{if(sessionStorage.getItem('lula-entrada')){sessionStorage.removeItem('lula-entrada');"
-        "document.documentElement.classList.add('entrada')}}catch(e){}</script></head>"
+        f"<title>{escape(titulo)} · Lula Macaroni</title><style>{CSS}</style></head>"
         "<body><div class='layout'>"
         "<input type='checkbox' id='menu' aria-label='Abrir menú'>"
         f"<header class='top'><label for='menu' class='burger' title='Menú'>{icono('menu')}</label>"
@@ -438,47 +433,72 @@ def page(titulo: str, activo: str, body: str, banner: str = "", decorar: bool = 
 
 
 # --- Portada (landing page) ------------------------------------------------------------------
+#
+# Opening the bare address (/) shows Inicio with the artwork laid over it. The art stays a moment,
+# then fades away and Inicio is already there underneath: no second page load, so the fade is seen
+# every time, even on a slow first load. A tap or any key skips the wait. The logo in the menu
+# goes back to /. If the data can't be read, portada() is shown on its own with an Entrar link.
 
 PORTADA_CSS = """
-:root{--paper:#F4EBD9;--ink:#2B1A12;--muted:#6A5644;--red:#9C0F0C}
-@media (prefers-color-scheme:dark){:root{--paper:#16120D;--ink:#F3EBDD;--muted:#BDAE98;--red:#EE7A6A}}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--paper);color:var(--ink);
-font:15px/1.5 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-.portada{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-gap:22px;padding:24px 16px 32px;text-align:center}
-.portada .banner{background:#F7E5C4;color:#6E4710;border-radius:10px;padding:8px 14px;font-size:.85rem}
+:root{--paper:#F4EBD9;--pt-ink:#2B1A12;--pt-muted:#6A5644;--red:#9C0F0C}
+@media (prefers-color-scheme:dark){:root{--paper:#16120D;--pt-ink:#F3EBDD;--pt-muted:#BDAE98;--red:#EE7A6A}}
+.portada{position:fixed;inset:0;z-index:1000;overflow:auto;background:var(--paper);color:var(--pt-ink);
+display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+padding:24px 16px 32px;text-align:center;font:15px/1.5 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+transition:opacity 1.2s ease,visibility 0s linear 1.2s}
+.portada.fuera{opacity:0;visibility:hidden;pointer-events:none}
+.portada .pt-banner{background:#F7E5C4;color:#6E4710;border-radius:10px;padding:8px 14px;font-size:.85rem}
 .portada figure{margin:0;display:flex;justify-content:center;width:100%}
 /* the art is shown whole: never cropped, never stretched */
 .portada img{display:block;width:auto;height:auto;max-width:min(100%,560px);max-height:72vh;
-object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(60,30,10,.18)}
+object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(60,30,10,.18);animation:aparece .8s ease both}
+@keyframes aparece{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
 .portada .marca{font:700 1.35rem/1.1 "DM Sans",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
-.portada .marca small{display:block;font:500 .78rem/1.4 "DM Sans",system-ui,sans-serif;color:var(--muted);margin-top:4px}
+.portada .marca small{display:block;font:500 .78rem/1.4 "DM Sans",system-ui,sans-serif;color:var(--pt-muted);margin-top:4px}
 .portada .entrar{display:inline-flex;align-items:center;gap:10px;background:var(--red);color:#fff;
 padding:13px 26px;border-radius:999px;font-weight:600;font-size:1rem;text-decoration:none;
-box-shadow:0 4px 14px rgba(158,27,34,.28);min-height:48px}
-.portada .entrar:hover{filter:brightness(1.08)}
-.portada .entrar:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+box-shadow:0 4px 14px rgba(158,27,34,.28);min-height:48px;border:0;cursor:pointer}
+.portada .entrar:hover{filter:brightness(1.08);text-decoration:none}
+.portada .entrar:focus-visible{outline:3px solid var(--pt-ink);outline-offset:3px}
 @media (prefers-color-scheme:dark){.portada .entrar{color:#1C1C1E}}
-/* the welcome page fades out on its own, then Inicio fades in */
-.portada{transition:opacity .9s ease}
-body.salir .portada{opacity:0}
-.portada img{animation:aparece .8s ease both}
-@keyframes aparece{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.portada,.portada img{transition:none;animation:none}}
+/* reduce motion: no zoom, only the plain fade */
+@media (prefers-reduced-motion:reduce){.portada img{animation:none}}
 """
 
-# Seconds the welcome art stays before fading into Inicio; a tap or key skips it.
+# How long the art stays before fading away; a tap or any key skips it.
 PORTADA_ESPERA_MS = 2600
-PORTADA_FUNDIDO_MS = 900
+PORTADA_FUNDIDO_MS = 1200  # matches the 1.2s transition in PORTADA_CSS
+
+
+def _portada_cuerpo(con_imagen: bool, banner: str, entrar: str) -> str:
+    ban = f'<div class="pt-banner">{escape(banner)}</div>' if banner else ""
+    img = ('<figure><img src="/portada.png" alt="Oh, the places you\'ll go!" '
+           'width="1070" height="1470"></figure>') if con_imagen else ""
+    return (f"{ban}{img}<p class='marca'>Lula Macaroni<small>Oficina del estudio</small></p>"
+            f"{entrar}")
+
+
+def con_portada(html: str, con_imagen: bool, banner: str = "") -> str:
+    """Inicio with the welcome art over it, fading away on its own."""
+    velo = (
+        f"<style>{PORTADA_CSS}</style>"
+        "<div class='portada' id='portada' role='dialog' aria-label='Bienvenida'>"
+        + _portada_cuerpo(con_imagen, banner,
+                          "<a class='entrar' href='/inicio' id='entrar'>Entrar →</a>")
+        + "</div>"
+        "<script>(function(){var v=document.getElementById('portada'),hecho=false;"
+        "function quita(e){if(e&&e.preventDefault)e.preventDefault();if(hecho)return;hecho=true;"
+        "v.classList.add('fuera');"
+        f"setTimeout(function(){{v.parentNode&&v.parentNode.removeChild(v)}},{PORTADA_FUNDIDO_MS + 100});"
+        "document.removeEventListener('keydown',quita);}"
+        "v.addEventListener('click',quita);document.addEventListener('keydown',quita);"
+        f"setTimeout(quita,{PORTADA_ESPERA_MS});}})();</script>"
+    )
+    return html.replace("<body>", "<body>" + velo, 1)
 
 
 def portada(con_imagen: bool, banner: str = "") -> str:
-    """Welcome page shown on entering the app; one button into Inicio."""
-    ban = f'<div class="banner">{escape(banner)}</div>' if banner else ""
-    img = ('<figure><img src="/portada.png" alt="Oh, the places you\'ll go!" '
-           'width="1070" height="1470"></figure>') if con_imagen else ""
+    """The welcome page on its own (used when the data can't be read)."""
     return (
         "<!doctype html><html lang='es-MX'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -486,18 +506,9 @@ def portada(con_imagen: bool, banner: str = "") -> str:
         "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=DM+Sans:"
         "opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap'>"
         f"<title>Bienvenida · Lula Macaroni</title><style>{PORTADA_CSS}</style></head>"
-        f"<body><main class='portada'>{ban}{img}"
-        "<p class='marca'>Lula Macaroni<small>Oficina del estudio</small></p>"
-        "<a class='entrar' href='/inicio'>Entrar →</a></main>"
-        "<script>(function(){var ido=false;function ir(){if(ido)return;ido=true;"
-        "try{sessionStorage.setItem('lula-entrada','1')}catch(e){}"
-        "var quieto=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;"
-        "document.body.classList.add('salir');"
-        f"setTimeout(function(){{location.replace('/inicio')}},quieto?0:{PORTADA_FUNDIDO_MS});}}"
-        f"setTimeout(ir,{PORTADA_ESPERA_MS});"
-        "document.addEventListener('click',function(e){e.preventDefault();ir()});"
-        "document.addEventListener('keydown',ir);})();</script>"
-        "</body></html>"
+        "<body><main class='portada'>"
+        + _portada_cuerpo(con_imagen, banner, "<a class='entrar' href='/inicio'>Entrar →</a>")
+        + "</main></body></html>"
     )
 
 
