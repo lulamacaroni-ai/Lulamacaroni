@@ -1,0 +1,37 @@
+# Secrets: never commit. Keys live in .env locally and in the Claude cloud environment at handover.
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+service-account*.json
+credentials*.json
+token*.json
+secrets/
+
+# Local runtime data (approval records, exports, caches). Business data lives in the workbook, not git.
+data/
+exports/
+*.local.json
+
+# Art files stay in Google Drive, never in the repo
+*.psd
+*.tif
+*.tiff
+masters/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
