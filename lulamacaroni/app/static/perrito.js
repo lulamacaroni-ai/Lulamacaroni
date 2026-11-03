@@ -91,6 +91,19 @@
   var pat = el("pattern", { id: "pf-rib", width: "4", height: "8", patternUnits: "userSpaceOnUse" }, defs);
   el("rect", { width: "4", height: "8", fill: SUETER }, pat);
   el("rect", { width: "1.3", height: "8", fill: RIBETE }, pat);
+  // light from above and in front: a soft highlight on the back, shade under the belly
+  var vol = el("linearGradient", { id: "pf-vol", x1: "0", y1: "0", x2: "0", y2: "1" }, defs);
+  el("stop", { offset: "0", "stop-color": "#fff", "stop-opacity": "0.22" }, vol);
+  el("stop", { offset: "0.45", "stop-color": "#fff", "stop-opacity": "0" }, vol);
+  el("stop", { offset: "1", "stop-color": "#2a0806", "stop-opacity": "0.38" }, vol);
+  var anca = el("radialGradient", { id: "pf-anca", cx: "0.4", cy: "0.3", r: "0.75" }, defs);
+  el("stop", { offset: "0", "stop-color": "#FFF6E2" }, anca);
+  el("stop", { offset: "0.6", "stop-color": FUR }, anca);
+  el("stop", { offset: "1", "stop-color": FUR_LEJOS }, anca);
+  var bl = el("filter", { id: "pf-sombra", x: "-30%", y: "-200%", width: "160%", height: "500%" }, defs);
+  el("feGaussianBlur", { stdDeviation: "2.6" }, bl);
+  // contact shadow on the ground: it follows the body, never flips
+  var sombra = el("ellipse", { fill: "#3b2410", opacity: "0.28", filter: "url(#pf-sombra)" }, svg);
 
   var cuerpo = el("g", {}, svg);                      // flips and folds; the head never does
   var g = el("g", { filter: "url(#pf-fuzz)" }, cuerpo);
@@ -112,8 +125,9 @@
   [[0, 0, 9], [-6, -6, 7], [3, -9, 6.5], [-2, 5, 6]].forEach(function (b) {
     el("circle", { cx: b[0], cy: b[1], r: b[2], fill: FUR, stroke: FUR_LINEA, "stroke-width": 0.8 }, cola);
   });
-  var ancas = el("ellipse", { rx: 19, ry: 17, fill: FUR, stroke: FUR_LINEA, "stroke-width": 0.8 }, g);
+  var ancas = el("ellipse", { rx: 19, ry: 17, fill: "url(#pf-anca)", stroke: FUR_LINEA, "stroke-width": 0.8 }, g);
   var torso = el("path", { fill: "url(#pf-rib)", stroke: RIBETE, "stroke-width": 1 }, g);
+  var torsoLuz = el("path", { fill: "url(#pf-vol)" }, g);   // roundness: same outline, shaded
   P.RH = pata(FUR); P.RF = pata(FUR, SUETER);
 
   var cabeza = el("g", {}, svg);
@@ -146,6 +160,10 @@
     ["LH", "RH", "LF", "RF"].forEach(function (k) {
       var tr = k.charAt(1) === "H", L = tr ? TRAS : DEL, pp = frac(fase - PASO[k]), b = PASO.apoyo;
       var raiz = tr ? { x: cad.x + 2, y: cad.y - 4 } : { x: hom.x + 2, y: hom.y - 4 };
+      // the far-side legs stand on a farther line of the ground, so they sit a little higher;
+      // seen end-on (turning) the two sides spread further apart
+      var lejos = k.charAt(0) === "L" ? (3 + 7 * (1 - Math.abs(giro))) * (1 - echado) : 0;
+      raiz.y -= lejos;
       var px, py, ang;   // paw position, and the angle of the lowest bone (degrees from straight
                          // down; positive = paw ahead of the wrist or hock)
       if (pp < b) {      // stance: paw planted, the body passes over it
@@ -159,6 +177,7 @@
                            : 8 + 14 * Math.sin(Math.PI * (q - 0.6) / 0.4);   // then the leg reaches forward
       }
       // lying down: front legs stretched forward along the pillow, hind legs folded under
+      py -= lejos;
       px = lerp(px, tr ? raiz.x + 12 : raiz.x + 20, echado); py = lerp(py, SUELO - 2, echado);
       ang = lerp(ang, tr ? 80 : 85, echado);
       var jx = px - L.c * Math.sin(ang * RAD), jy = py - L.c * Math.cos(ang * RAD);   // wrist or hock
@@ -174,27 +193,37 @@
       "C" + (cad.x - 16) + " " + (cad.y - 22) + " " + (cad.x + 10) + " " + top + " " + ((cad.x + hom.x) / 2) + " " + top +
       "C" + (hom.x - 6) + " " + top + " " + (hom.x + 30) + " " + (hom.y - 30) + " " + (hom.x + 30) + " " + (hom.y + 4) +
       "C" + (hom.x + 28) + " " + (hom.y + 16) + " " + (cad.x - 4) + " " + (cad.y + 16) + " " + (cad.x - 14) + " " + (cad.y + 2) + "Z");
+    torsoLuz.setAttribute("d", torso.getAttribute("d"));
     ancas.setAttribute("cx", cad.x - 2); ancas.setAttribute("cy", cad.y - 6);
     cola.setAttribute("transform", "translate(" + (cad.x - 16) + " " + (cad.y - 22) + ") rotate(" +
       (Math.sin(2 * Math.PI * fase * 1.5) * 16) + ")");
     // facing: squeeze the body around the head's line so it turns behind the head
     var piv = lerp(CENTRO, CABEZA_X, echado);
     cuerpo.setAttribute("transform", "translate(" + piv + " 0) scale(" + giro + " 1) translate(" + (-piv) + " 0)");
-    return { x: piv + giro * (CABEZA_X - piv), y: hom.y - 6 - bob * 0.5 + 30 * echado };
+    var ag = Math.abs(giro), mitad = piv + giro * (CENTRO - piv);
+    sombra.setAttribute("cx", lerp(mitad, piv + giro * (CABEZA_X - 18 - piv), echado));
+    sombra.setAttribute("cy", SUELO + 1 - 2 * (1 - ag) * (1 - echado));
+    sombra.setAttribute("rx", lerp(30 + 22 * ag, 46, echado) * (1 + 0.04 * bob * (1 - echado)));
+    sombra.setAttribute("ry", lerp(4 + 6 * (1 - ag), 7, echado));
+    // the head rides the shoulders a beat late, nodding slightly with each step
+    var nod = Math.sin(4 * Math.PI * fase - 0.9) * (1 - echado);
+    return { x: piv + giro * (CABEZA_X - piv), y: hom.y - 6 - bob * 0.5 + 0.8 * nod + 30 * echado, r: 1.6 * nod * (giro < 0 ? -1 : 1) };
   }
-  function cabezaEn(c) { cabeza.setAttribute("transform", "translate(" + c.x + " " + c.y + ")"); }
+  function cabezaEn(c) {
+    cabeza.setAttribute("transform", "translate(" + c.x + " " + c.y + ") rotate(" + (c.r || 0) + " 0 -10)");
+  }
 
   // ---- motion --------------------------------------------------------------------------------
   var arriba = piso - SUELO * u;                      // div top so the paws stand on the pillow line
   var meta = almCx - CENTRO * u;                      // body centred over the pillow
   var x = x0 - wpx, v = 0, VEL = clamp(ancho * 0.09, 90, 125), fase = 0, t = 0, antes = null;
-  var estado = "camina", tEstado = 0, R = almW * 0.17;
+  var aplasto = false, estado = "camina", tEstado = 0, R = almW * 0.17;
   var VUELTAS = 2, T_VUELTAS = 2.8, T_ECHARSE = 1.2;
   var HZ = 2.6;                                       // a small dog's brisk walk
 
-  function coloca(px, py, escala) {
+  function coloca(px, py, escala, inclina) {
     caja.style.left = px + "px"; caja.style.top = py + "px";
-    caja.style.transform = escala === 1 ? "" : "scale(" + escala + ")";
+    caja.style.transform = (escala === 1 ? "" : "scale(" + escala + ") ") + (inclina ? "rotate(" + inclina + "deg)" : "");
   }
 
   function cuadro(ahora) {
@@ -218,7 +247,10 @@
       var cz = Math.cos(theta), giro = (cz < 0 ? -1 : 1) * Math.max(0.28, Math.abs(cz));
       fase = frac(fase + HZ * 0.8 * dt);
       cabezaEn(postura(fase, 16, 0, giro));
-      coloca(meta + R * Math.sin(theta), arriba - 3 * (1 - cz), 0.95 + 0.05 * cz);
+      // nearer the viewer at the front of the loop: lower and bigger; farther at the back;
+      // leaning into the turn while it moves across
+      coloca(meta + R * Math.sin(theta), arriba - 5 * (1 - cz), 0.9 + 0.1 * cz,
+        -3.5 * Math.sin(theta) * Math.sin(Math.PI * k));
       if (k >= 1) { estado = "echarse"; tEstado = t; }
     } else {
       // fold the legs, sink into the pillow, and turn to face forward
@@ -226,7 +258,17 @@
       cabezaEn(postura(fase, 0, e, giro2));
       manos.setAttribute("opacity", suave((e - 0.5) * 2));
       manos.setAttribute("transform", "translate(0 " + (SUELO - 9 + 4 * (1 - e)) + ")");
-      coloca(lerp(meta, almCx - CABEZA_X * u, e), arriba, 1);
+      // a small settle as the weight lands: the pillow gives, the body sinks and comes back up
+      var asiento = Math.sin(Math.PI * clamp((t - tEstado - T_ECHARSE * 0.75) / 0.55, 0, 1));
+      coloca(lerp(meta, almCx - CABEZA_X * u, e), arriba + 2.5 * asiento, 1);
+      if (!aplasto && e > 0.8) {
+        aplasto = true;
+        [fondo.div, frente.div].forEach(function (d) {
+          d.style.transformOrigin = "50% 80%";
+          d.animate([{ transform: "scale(1,1)" }, { transform: "scale(1.03,0.9)" }, { transform: "scale(1,1)" }],
+            { duration: 600, easing: "ease-out" });
+        });
+      }
       if (e >= 1) {
         // settled: slow breathing as a Web Animation, so no frame loop keeps running
         caja.animate([{ transform: "scale(1,1)" }, { transform: "scale(1.012,1.03)" }, { transform: "scale(1,1)" }],
