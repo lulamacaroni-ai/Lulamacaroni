@@ -6,9 +6,11 @@ colors come from Lore's artwork in the store; DM Sans, the storefront's font.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 from html import escape
+from pathlib import Path
 
 from ..approval.page import render_cards
 from . import arte
@@ -356,28 +358,25 @@ def calidad(d: Dato) -> str:
     return f'<span class="q {d.calidad}">{label}</span>'
 
 
-# The puppy: now and then, on Inicio, a dog pillow appears next to "Hola, Lore"; the puppy walks
-# out from behind the menu, turns round on the pillow twice, lies down facing forward and stays.
-# The animation lives in static/perrito.js and, like the image, only loads on the visits when it
-# plays. Decoration only: it never blocks a click, is hidden from screen readers and skips people
-# who turn motion off. Add ?perrito=1 to Inicio to see it.
-PERRITO_CADA_MIN = 20     # at most once per this many minutes per browser
-PERRITO_PROBABILIDAD = 0.35  # chance on a visit once that wait has passed (the first visit always plays)
+# The puppy: on every visit to Inicio, once the welcome art has faded, a dog pillow appears next to
+# "Hola, Lore"; the puppy walks out from behind the menu, turns round on the pillow twice, lies down
+# facing forward and stays. The animation lives in static/perrito.js; its address carries a hash of
+# the file so browsers always fetch the current version. Decoration only: it never blocks a click,
+# is hidden from screen readers and skips people who turn motion off.
+_PERRITO_FILE = Path(__file__).with_name("static") / "perrito.js"
+PERRITO_VERSION = (hashlib.sha1(_PERRITO_FILE.read_bytes()).hexdigest()[:10]
+                   if _PERRITO_FILE.is_file() else "0")
 PERRITO_JS = (
     "(function(){var W=window,D=document;"
     "if(!W.matchMedia||!D.body.animate)return;"
-    "if(W.matchMedia('(prefers-reduced-motion: reduce)').matches)return;if(!/^\\/(inicio)?$/.test(location.pathname))return;"
-    "var forzar=/[?&]perrito=1/.test(location.search),ahora=Date.now(),ultimo=0;"
-    "try{ultimo=+localStorage.getItem('lula-perrito-cojin')||0}catch(e){}"
-    "if(!forzar){if(D.documentElement.classList.contains('entrada'))return;"
-    f"if(ultimo&&(ahora-ultimo<{PERRITO_CADA_MIN}*60000||Math.random()>{PERRITO_PROBABILIDAD}))return;}}"
-    "try{localStorage.setItem('lula-perrito-cojin',String(ahora))}catch(e){}"
-    "function go(){if(D.getElementById('portada')){setTimeout(go,400);return}if(D.hidden)return;var s=D.createElement('script');s.src='/perrito.js';s.async=true;"
+    "if(W.matchMedia('(prefers-reduced-motion: reduce)').matches)return;"
+    "if(!/^\\/(inicio)?$/.test(location.pathname))return;"
+    "function go(){if(D.getElementById('portada')){setTimeout(go,400);return}"
+    f"var s=D.createElement('script');s.src='/perrito.js?v={PERRITO_VERSION}';s.async=true;"
     "D.body.appendChild(s)}"
-    "function listo(){setTimeout(go,forzar?600:2500)}"
+    "function listo(){setTimeout(go,600)}"
     "if(D.readyState==='complete')listo();else W.addEventListener('load',listo);})();"
 )
-
 
 # A screen's heading: an optional kicker line, the <h1>, and the line under it.
 _CABECERA = re.compile(r"""^((?:<p class=["']sub["']>.*?</p>)?<h1>.*?</h1>"""
