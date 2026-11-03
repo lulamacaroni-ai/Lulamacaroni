@@ -186,18 +186,17 @@ def test_welcome_art_fades_away_every_time(book, store):
     assert "@media (prefers-reduced-motion:reduce){.portada img{animation:none}}" in views.PORTADA_CSS
 
 
-def test_puppy_plays_now_and_then_on_screens_but_not_on_the_welcome_page(book, store):
+def test_puppy_plays_on_inicio_but_not_on_the_welcome_page(book, store):
     from lulamacaroni.app import views
 
     d = Datos(book, store)
     inicio = render("/inicio", {}, d)
-    assert "/perrito.js" in inicio and "lula-perrito" in inicio
+    # the script address carries a hash of the file, so browsers never run a stale copy
+    assert f"/perrito.js?v={views.PERRITO_VERSION}" in inicio and len(views.PERRITO_VERSION) == 10
     assert "getElementById('portada')" in inicio  # waits for the welcome art to fade first
     assert "prefers-reduced-motion" in inicio  # no motion for people who turn it off
-    assert "perrito=1" in inicio  # a way to see it on demand
     assert "perrito" not in views.portada(True)  # never on the welcome page
     assert "pointer-events:none" in views.CSS  # it never blocks a click
-    assert 0 < views.PERRITO_PROBABILIDAD < 1 and views.PERRITO_CADA_MIN >= 5
 
 
 def test_puppy_art_is_cut_out_but_never_stretched():
@@ -216,7 +215,8 @@ def test_puppy_art_is_cut_out_but_never_stretched():
     assert "1136 / 1246" in js and 'preserveAspectRatio: "xMidYMid meet"' in js  # never stretched
     assert "/perrito.js" in views.PERRITO_JS  # the animation loads only when it plays
     # the dog walks to a pillow by the greeting, turns round twice and lies down facing forward
-    for clave in ("main h1", "PASO", "VUELTAS", "echarse", "iterations: Infinity"):
+    for clave in ("main h1", "PASO", "VUELTAS", "echarse", "iterations: Infinity",
+                  "DEL = {", "TRAS = {"):  # three-bone legs: wrist and hock, not just a knee
         assert clave in js
     assert "inicio)?$" in views.PERRITO_JS  # only on Inicio, next to "Hola, Lore"
 

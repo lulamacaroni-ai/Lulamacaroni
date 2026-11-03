@@ -67,7 +67,10 @@
   el("path", { d: "M5 17.5 C 14 29, 86 29, 95 17.5", fill: "none", stroke: CEREZA, "stroke-width": 1.2, "stroke-dasharray": "3 2" }, frente.g);
 
   // ---- the dog -------------------------------------------------------------------------------
-  var MUSLO = 24, CANILLA = 24;
+  // Leg bones (drawing units), in proportion to the head (74 wide).
+  // Front: shoulder joint → humerus → elbow (points back) → forearm → wrist/carpus → pastern → paw.
+  // Hind: hip → femur → stifle/knee (points forward) → tibia → hock (points back) → metatarsus → paw.
+  var DEL = { a: 21, b: 18, c: 7 }, TRAS = { a: 19, b: 19, c: 13 };
   var HOMBRO = { x: 124, y: 88 }, CADERA = { x: 70, y: 88 }, CENTRO = 100, CABEZA_X = 140;
   var FUR = "#F4E8CC", FUR_LEJOS = "#DCCAA3", FUR_LINEA = "#CDB98F";
   var SUETER = "#7E1D23", SUETER_LEJOS = "#62151A", RIBETE = "#661419";
@@ -91,12 +94,16 @@
 
   var cuerpo = el("g", {}, svg);                      // flips and folds; the head never does
   var g = el("g", { filter: "url(#pf-fuzz)" }, cuerpo);
+  function hueso(gr, color, ancho) {
+    return el("path", { stroke: color, "stroke-width": ancho, "stroke-linecap": "round", "stroke-linejoin": "round", fill: "none" }, gr);
+  }
   function pata(color, manga) {
-    var gr = el("g", {}, g);
+    var gr = el("g", {}, g), del = !!manga;
     return {
-      muslo: el("path", { stroke: manga || color, "stroke-width": manga ? 15 : 14, "stroke-linecap": "round", fill: "none" }, gr),
-      canilla: el("path", { stroke: color, "stroke-width": 12, "stroke-linecap": "round", fill: "none" }, gr),
-      pie: el("ellipse", { rx: 7.5, ry: 4.8, fill: color, stroke: FUR_LINEA, "stroke-width": 0.8 }, gr),
+      sup: hueso(gr, manga || color, del ? 17 : 18),   // humerus in its sleeve / the thigh (femur)
+      med: hueso(gr, color, del ? 13 : 12),             // forearm / shank (tibia)
+      inf: hueso(gr, color, del ? 10 : 8.5),                       // pastern / metatarsus below the wrist or hock
+      pie: el("ellipse", { rx: 7, ry: 4.4, fill: color, stroke: FUR_LINEA, "stroke-width": 0.8 }, gr),
     };
   }
   var P = {};
@@ -119,13 +126,16 @@
     el("ellipse", { cx: CABEZA_X + dx, cy: 0, rx: 10, ry: 6.5, fill: FUR, stroke: FUR_LINEA, "stroke-width": 0.8 }, manos);
   });
 
-  function ik(ax, ay, fx, fy, dobla) {
-    var dx = fx - ax, dy = fy - ay, d = Math.sqrt(dx * dx + dy * dy) || 0.01, max = MUSLO + CANILLA - 0.01;
+  // Two bones from (ax, ay) to (fx, fy); the middle joint points back (+1) or forward (-1).
+  function ik(ax, ay, fx, fy, A, B, dobla) {
+    var dx = fx - ax, dy = fy - ay, d = Math.sqrt(dx * dx + dy * dy) || 0.01, max = A + B - 0.01;
     if (d > max) { fx = ax + dx / d * max; fy = ay + dy / d * max; dx = fx - ax; dy = fy - ay; d = max; }
-    var a = (MUSLO * MUSLO - CANILLA * CANILLA + d * d) / (2 * d), h = Math.sqrt(Math.max(0, MUSLO * MUSLO - a * a));
+    var a = (A * A - B * B + d * d) / (2 * d), h = Math.sqrt(Math.max(0, A * A - a * a));
     var mx = ax + dx * a / d, my = ay + dy * a / d;
     return { kx: mx - dobla * h * dy / d, ky: my + dobla * h * dx / d, fx: fx, fy: fy };
   }
+  function linea(path, x1, y1, x2, y2) { path.setAttribute("d", "M" + x1 + " " + y1 + "L" + x2 + " " + y2); }
+  var RAD = Math.PI / 180;
 
   // One frame of the body. fase: stride phase; sweep: how far a planted paw travels (units);
   // echado: 0 standing .. 1 lying (legs folded, body lowered); giro: facing, -1..1 (side-on at ±1,
@@ -134,17 +144,29 @@
     var bob = -1.4 * Math.cos(4 * Math.PI * fase) * (1 - echado) + 22 * echado;
     var hom = { x: HOMBRO.x, y: HOMBRO.y + bob }, cad = { x: CADERA.x, y: CADERA.y + bob };
     ["LH", "RH", "LF", "RF"].forEach(function (k) {
-      var tr = k.charAt(1) === "H", raiz = tr ? cad : hom, pp = frac(fase - PASO[k]), b = PASO.apoyo, fx, fy;
-      if (pp < b) { fx = raiz.x + sweep / 2 - sweep * pp / b; fy = SUELO; }
-      else {
-        var q = (pp - b) / (1 - b), e = q - Math.sin(2 * Math.PI * q) / (2 * Math.PI);
-        fx = raiz.x - sweep / 2 + sweep * e; fy = SUELO - 9 * Math.sin(Math.PI * q);
+      var tr = k.charAt(1) === "H", L = tr ? TRAS : DEL, pp = frac(fase - PASO[k]), b = PASO.apoyo;
+      var raiz = tr ? { x: cad.x + 2, y: cad.y - 4 } : { x: hom.x + 2, y: hom.y - 4 };
+      var px, py, ang;   // paw position, and the angle of the lowest bone (degrees from straight
+                         // down; positive = paw ahead of the wrist or hock)
+      if (pp < b) {      // stance: paw planted, the body passes over it
+        px = raiz.x + sweep / 2 - sweep * pp / b; py = SUELO;
+        ang = tr ? 24 : 8;   // the hock sits behind and above the paw; the pastern slopes a little
+      } else {           // swing: lift, fold and reach forward
+        var q = (pp - b) / (1 - b), e = q - Math.sin(2 * Math.PI * q) / (2 * Math.PI), s1 = Math.sin(Math.PI * q);
+        px = raiz.x - sweep / 2 + sweep * e; py = SUELO - (tr ? 8 : 10) * s1;
+        if (tr) ang = 24 - 70 * s1 * (1 - q) + 20 * s1 * q;           // hock flexes: paw trails, then reaches
+        else ang = q < 0.6 ? 8 - 115 * Math.sin(Math.PI * q / 0.6)    // wrist folds: paw tucks up behind
+                           : 8 + 14 * Math.sin(Math.PI * (q - 0.6) / 0.4);   // then the leg reaches forward
       }
-      fx = lerp(fx, raiz.x + (tr ? 16 : -14), echado); fy = lerp(fy, raiz.y + 10, echado);
-      var s = ik(raiz.x, raiz.y, fx, fy, tr ? 1 : -1), leg = P[k];
-      leg.muslo.setAttribute("d", "M" + raiz.x + " " + raiz.y + "L" + s.kx + " " + s.ky);
-      leg.canilla.setAttribute("d", "M" + s.kx + " " + s.ky + "L" + s.fx + " " + s.fy);
-      leg.pie.setAttribute("cx", s.fx + 2.5); leg.pie.setAttribute("cy", s.fy);
+      // lying down: front legs stretched forward along the pillow, hind legs folded under
+      px = lerp(px, tr ? raiz.x + 12 : raiz.x + 20, echado); py = lerp(py, SUELO - 2, echado);
+      ang = lerp(ang, tr ? 80 : 85, echado);
+      var jx = px - L.c * Math.sin(ang * RAD), jy = py - L.c * Math.cos(ang * RAD);   // wrist or hock
+      var s = ik(raiz.x, raiz.y, jx, jy, L.a, L.b, tr ? -1 : 1), leg = P[k];
+      linea(leg.sup, raiz.x, raiz.y, s.kx, s.ky);    // humerus / femur
+      linea(leg.med, s.kx, s.ky, s.fx, s.fy);        // forearm / tibia
+      linea(leg.inf, s.fx, s.fy, px, py);            // pastern / metatarsus
+      leg.pie.setAttribute("cx", px + 3); leg.pie.setAttribute("cy", py - 1);
     });
     var top = Math.min(hom.y, cad.y) - 32;
     torso.setAttribute("d",
