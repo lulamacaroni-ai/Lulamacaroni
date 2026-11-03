@@ -231,6 +231,15 @@ font-size:.65rem;text-align:center;line-height:1.1}
 .ph.hero img{max-height:424px}
 .gal{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .desc p{margin:6px 0}
+
+/* --- the puppy (Lore's art, cut out of its background, never cropped or stretched) ------ */
+.perrito{position:fixed;top:0;left:0;z-index:19;pointer-events:none;width:var(--perro,76px)}
+.perrito .bote,.perrito .giro{display:block}
+.perrito img{display:block;width:100%;height:auto;filter:drop-shadow(0 2px 3px rgba(43,26,18,.25))}
+.perrito .uy{position:absolute;left:62%;top:-26px;background:var(--card);color:var(--ink);
+border:1px solid var(--line);border-radius:10px;padding:1px 7px;font:700 .8rem/1.4 "DM Sans",system-ui,sans-serif;
+opacity:0;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.perrito{display:none}}
 """
 
 
@@ -308,6 +317,76 @@ def calidad(d: Dato) -> str:
     return f'<span class="q {d.calidad}">{label}</span>'
 
 
+# The puppy: now and then it peeks out from behind the menu, ducks back, then runs along the
+# top, trips on its sweater and rolls head over heels off the right edge. Decoration only:
+# it never blocks a click, is hidden from screen readers, skips people who turn motion off,
+# and its image only loads on the visits when it plays. Add ?perrito=1 to any screen to see it.
+PERRITO_CADA_MIN = 20     # at most once per this many minutes per browser
+PERRITO_PROBABILIDAD = 0.35  # chance on a visit once that wait has passed (the first visit always plays)
+PERRITO_JS = (
+    "(function(){var W=window,D=document;"
+    "if(!W.matchMedia||!D.body.animate)return;"
+    "if(W.matchMedia('(prefers-reduced-motion: reduce)').matches)return;"
+    "var forzar=/[?&]perrito=1/.test(location.search),ahora=Date.now(),ultimo=0;"
+    "try{ultimo=+localStorage.getItem('lula-perrito')||0}catch(e){}"
+    "if(!forzar){if(D.documentElement.classList.contains('entrada'))return;"
+    f"if(ultimo&&(ahora-ultimo<{PERRITO_CADA_MIN}*60000||Math.random()>{PERRITO_PROBABILIDAD}))return;}}"
+    "try{localStorage.setItem('lula-perrito',String(ahora))}catch(e){}"
+    "function go(){var side=D.querySelector('.side'),r=side?side.getBoundingClientRect():null,"
+    "conMenu=!!(r&&r.right>0),x0=conMenu?r.right:0,ancho=W.innerWidth,"
+    "w=Math.round(Math.max(56,Math.min(92,ancho*.07))),h=Math.round(w*1136/1246),"
+    "top0=conMenu?0:(D.querySelector('.top')||{offsetHeight:0}).offsetHeight;"
+    "var el=D.createElement('div');el.className='perrito';el.setAttribute('aria-hidden','true');"
+    "el.style.setProperty('--perro',w+'px');"
+    "el.innerHTML='<span class=\"bote\"><span class=\"giro\"><img src=\"/perrito.png\" alt=\"\"></span></span>"
+    "<span class=\"uy\">¡uy!</span>';"
+    "var bote=el.firstChild,giro=bote.firstChild,uy=el.lastChild,img=giro.firstChild;"
+    "function fin(){el.remove()}"
+    "function corre(){"
+    # run: from behind the menu to the trip point, bobbing
+    "var y=top0+6,tropiezo=x0+(ancho-x0)*.48,fuera=ancho+w*1.6;"
+    "el.style.transform='translate('+(x0-w)+'px,'+y+'px)';"
+    "var t1=1700,t2=1500;"
+    "var va=el.animate([{transform:'translate('+(x0-w)+'px,'+y+'px)'},"
+    "{transform:'translate('+tropiezo+'px,'+y+'px)'}],{duration:t1,easing:'linear',fill:'forwards'});"
+    "var trote=bote.animate([{transform:'translateY(0) rotate(-4deg)'},{transform:'translateY(-9px) rotate(3deg)'},"
+    "{transform:'translateY(0) rotate(-4deg)'}],{duration:230,iterations:Math.ceil(t1/230)});"
+    "va.finished.then(function(){trote.cancel();"
+    # trip: the sweater catches, a little hop and a pitch forward
+    "uy.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none',offset:.2},"
+    "{opacity:1,offset:.75},{opacity:0,transform:'translateY(-6px)'}],{duration:900,fill:'forwards'});"
+    "giro.animate([{transform:'rotate(0)'},{transform:'rotate(28deg) translateY(2px)',offset:.35},"
+    "{transform:'rotate(18deg)',offset:.6},{transform:'rotate(40deg)'}],{duration:320,easing:'ease-in',fill:'forwards'})"
+    ".finished.then(function(){"
+    # roll head over heels to the right and off the screen
+    "giro.animate([{transform:'rotate(40deg)'},{transform:'rotate(1120deg)'}],"
+    "{duration:t2,easing:'cubic-bezier(.3,.1,.6,1)',fill:'forwards'});"
+    "bote.animate([{transform:'translateY(0)'},{transform:'translateY(-14px)',offset:.15},"
+    "{transform:'translateY(0)',offset:.32},{transform:'translateY(-7px)',offset:.48},"
+    "{transform:'translateY(0)',offset:.64},{transform:'translateY(-3px)',offset:.8},"
+    "{transform:'translateY(0)'}],{duration:t2,fill:'forwards'});"
+    "el.animate([{transform:'translate('+tropiezo+'px,'+y+'px)'},{transform:'translate('+fuera+'px,'+y+'px)'}],"
+    "{duration:t2,easing:'cubic-bezier(.35,.2,.7,1)',fill:'forwards'}).finished.then(fin);"
+    "});});}"
+    # peek: lying on its side behind the menu, the head comes out, looks around, ducks back
+    "var py=Math.round(W.innerHeight*.42),sale=Math.round(w*.85),"
+    "base='translate('+Math.round(x0-(w+h)/2-2)+'px,'+py+'px) ',fuera0=0;"
+    "img.onload=function(){D.body.appendChild(el);"
+    "var mira=el.animate(["
+    "{transform:base+'translateX('+fuera0+'px) rotate(90deg)'},"
+    "{transform:base+'translateX('+sale+'px) rotate(84deg)',offset:.22},"
+    "{transform:base+'translateX('+sale+'px) rotate(72deg)',offset:.42},"
+    "{transform:base+'translateX('+sale+'px) rotate(94deg)',offset:.62},"
+    "{transform:base+'translateX('+(sale-4)+'px) rotate(84deg)',offset:.76},"
+    "{transform:base+'translateX('+fuera0+'px) rotate(90deg)'}],"
+    "{duration:2300,easing:'ease-in-out',fill:'forwards'});"
+    "mira.finished.then(function(){setTimeout(function(){mira.cancel();corre()},650)});};"
+    "img.onerror=fin;}"
+    "function listo(){setTimeout(function(){if(!D.hidden)go()},forzar?600:2500)}"
+    "if(D.readyState==='complete')listo();else W.addEventListener('load',listo);})();"
+)
+
+
 def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
     grupos = []
     aqui = ""
@@ -343,7 +422,7 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
         "<div class='foot'>Solo lectura · lo que se publica o gasta pasa por Aprobar.</div></aside>"
         "<label for='menu' class='veil' aria-hidden='true'></label>"
         f"<div class='content'><main>{ban}{body}</main></div>"
-        "</div></body></html>"
+        f"</div><script>{PERRITO_JS}</script></body></html>"
     )
 
 
