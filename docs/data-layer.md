@@ -78,6 +78,11 @@ One row per: Un SKU publicado en un canal. Key: `listado_ref`.
 | `ultima_sync` |  |
 | `id_producto_canal` |  |
 | `ruta_pod` | prodigi-app, frame-it-easy-app, prodigi-api, manual, desconocida, varias |
+| `imagen_url` |  |
+| `descripcion` |  |
+| `etiquetas` |  |
+| `tipo_producto` |  |
+| `imagenes_producto` |  |
 
 ### Pedidos
 
@@ -117,6 +122,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `utm_campana` |  |
 | `referente` |  |
 | `cliente_id` |  |
+| `imagen_url` |  |
 
 ### Pagos
 

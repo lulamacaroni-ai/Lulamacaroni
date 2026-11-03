@@ -105,10 +105,41 @@ form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 input[type=text]{flex:1 1 100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 button{flex:1;padding:12px;border:0;border-radius:8px;font-weight:600;color:#fff;cursor:pointer;font:inherit;font-weight:600}
 button.ok{background:#2f6b3a}button.no{background:#9b2c2c}
+.pr{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.ph{flex:0 0 auto;width:72px;height:72px;border-radius:8px;background:var(--chip);
+display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);
+font-size:.65rem;text-align:center;line-height:1.1}
+.ph img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+.ph.sm{width:52px;height:52px}
+.ph.hero{width:100%;height:auto;min-height:120px;max-height:440px;padding:8px}
+.ph.hero img{max-height:424px}
+.gal{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.desc p{margin:6px 0}
 """
 
 
 # --- formatting ---------------------------------------------------------------------------
+
+def _cdn(url: str, ancho: int) -> str:
+    """Ask Shopify's CDN for a smaller copy: it scales proportionally, never crops."""
+    if not url.startswith("https://cdn.shopify.com/") or "width=" in url:
+        return url
+    return f"{url}{'&' if '?' in url else '?'}width={ancho}"
+
+
+def imagen(url: str, alt: str, clase: str = "", ancho: int = 240) -> str:
+    """A product image shown whole (scaled to fit its box, never cropped or stretched).
+
+    Only https links are shown; anything else in the sheet becomes the "sin imagen" box.
+    The image stays on the channel's CDN: nothing is copied or changed.
+    """
+    url = (url or "").strip()
+    cls = f"ph {clase}".strip()
+    if not url.startswith("https://"):
+        return f'<div class="{cls}">sin imagen</div>'
+    return (f'<div class="{cls}"><img src="{escape(_cdn(url, ancho))}" alt="{escape(alt)}" '
+            'loading="lazy" referrerpolicy="no-referrer"></div>')
+
 
 def fecha(dt: datetime | None, hora: bool = True) -> str:
     if dt is None:
@@ -280,12 +311,16 @@ def _pedido(p: Pedido) -> str:
     alert = " alert" if p.atencion else ""
     extra = f'<div class="m w">{escape(p.atencion)}</div>' if p.atencion else ""
     track = f" · tracking {escape(p.tracking)}" if p.tracking else ""
+    foto = next(((r.get("imagen_url"), r.get("producto") or "") for r in p.lineas
+                 if r.get("imagen_url")), ("", ""))
     return (
-        f'<div class="card{alert}"><div class="row"><div><div class="t">#{escape(p.numero)} · '
+        f'<div class="card{alert}"><div class="row"><div class="pr">'
+        f'{imagen(str(foto[0]), str(foto[1]), "sm", 160)}<div>'
+        f'<div class="t">#{escape(p.numero)} · '
         f"{escape(CANAL.get(p.canal, p.canal))}</div>"
         f'<div class="m">{escape(prods)}</div>'
         f'<div class="m">{fecha(p.fecha)} · {escape(ESTADO_PEDIDO.get(p.estado, p.estado))} · '
-        f"imprime: {escape(rutas)}{track}</div>{extra}</div>"
+        f"imprime: {escape(rutas)}{track}</div>{extra}</div></div>"
         f'<div class="r">{usd(p.neto)}<div class="m">neto</div>{_margen(p)}</div></div></div>'
     )
 
@@ -389,14 +424,15 @@ def catalogo(fichas: list, originales: list, datos: list[Dato], filtro: str, fue
         obra = (f" · obra {escape(f.obras[0].get('obra_id', ''))}" if f.obras
                 else " · sin ligar a una obra")
         rows.append(
-            f'<div class="card{" alert" if avisos else ""}"><div class="row"><div>'
-            f'<div class="t"><a href="{link}">{escape(p.titulo)}</a></div>'
+            f'<div class="card{" alert" if avisos else ""}"><div class="row"><div class="pr">'
+            f'<a href="{link}" aria-hidden="true" tabindex="-1">{imagen(p.imagen, p.titulo)}</a>'
+            f'<div><div class="t"><a href="{link}">{escape(p.titulo)}</a></div>'
             f'<div class="m"><span class="tag">{escape(LINEA.get(p.linea, p.linea))}</span>'
             f"{escape(CANAL.get(p.canal, p.canal))} · {p.variantes} variante(s) · {_precio(p)}</div>"
             f'<div class="m">Imprime: {escape(_rutas(p.rutas))} · coste en {f.con_costo} de '
             f"{p.variantes} · archivo sin revisar en {f.archivos_sin}{obra}</div>"
             + "".join(f'<div class="m w">{escape(a)}</div>' for a in avisos)
-            + f'</div><span class="badge {badge.get(p.estado, "gray")}">'
+            + f'</div></div><span class="badge {badge.get(p.estado, "gray")}">'
             f"{escape(ESTADO_LISTADO.get(p.estado, p.estado))}</span></div></div>")
     if filtro in ("todo", "mx"):
         rows.append("<h2>Originales México</h2>")
@@ -437,6 +473,34 @@ def _celda(d: Dato) -> str:
     return f'<span title="{escape(title)}">{escape(valor(d))}</span> {calidad(d)}'
 
 
+def _parrafos(texto: str) -> str:
+    partes = [t.strip() for t in texto.splitlines() if t.strip()]
+    return "".join(f"<p>{escape(t)}</p>" for t in partes)
+
+
+def _contenido_producto(p, actualizado: datetime | None) -> str:
+    """Images, description, type and tags exactly as the store has them (read-only)."""
+    origen = (f'<p class="meta">Fuente: Shopify (imágenes y texto del producto) · '
+              f"actualizado {fecha(actualizado)}. Las imágenes se ven completas, sin recortar; "
+              "se cambian en Shopify.</p>")
+    if not (p.imagenes or p.descripcion or p.etiquetas or p.tipo):
+        return ('<h2>En la tienda</h2><div class="card info"><div class="m">Aún no hay imagen ni '
+                "descripción en la hoja: llegan con la próxima sincronización de Shopify."
+                "</div></div>")
+    portada = imagen(p.imagen, p.titulo, "hero", 900)
+    galeria = "".join(
+        f'<a href="{escape(u)}" target="_blank" rel="noopener">'
+        f'{imagen(u, f"{p.titulo}, imagen {i}", "sm", 160)}</a>'
+        for i, u in enumerate(p.imagenes, 1)) if len(p.imagenes) > 1 else ""
+    desc = (f'<div class="desc">{_parrafos(p.descripcion)}</div>' if p.descripcion
+            else '<p class="m">Sin descripción en Shopify.</p>')
+    return (
+        f'<h2>En la tienda</h2><div class="card">{portada}'
+        + (f'<div class="gal">{galeria}</div>' if galeria else "")
+        + f'{desc}<p class="m">Tipo: {escape(p.tipo or "—")} · Etiquetas: '
+        f'{escape(p.etiquetas or "sin etiquetas en Shopify")}</p>{origen}</div>')
+
+
 def producto(f, fuentes, now: datetime, banner: str = "") -> str:
     p = f.producto
     shop = fuentes["shopify"]
@@ -446,13 +510,17 @@ def producto(f, fuentes, now: datetime, banner: str = "") -> str:
                 if v.margen_real is not None else "")
         cls, txt = ARCHIVO[v.archivo.estado]
         ruta_cls = "warn" if v.ruta in ("manual", "desconocida", "varias") else "gray"
+        foto = str(v.listado.get("imagen_url") or "")
+        foto = (imagen(foto, f"{p.titulo} / {v.etiqueta}", "sm", 160)
+                if foto and foto != p.imagen else "")
         rows.append(
-            f'<div class="card"><div class="row"><div><div class="t">{escape(v.etiqueta)}</div>'
+            f'<div class="card"><div class="row"><div class="pr">{foto}<div>'
+            f'<div class="t">{escape(v.etiqueta)}</div>'
             f'<div class="m">{escape(v.sku) or "sin SKU"} · imprime '
             f'<span class="badge {ruta_cls}">{escape(RUTA_CORTA.get(v.ruta, v.ruta) or "—")}</span></div>'
             f'<div class="m">Coste {_celda(v.costo)} · Margen {_celda(v.margen)}{real}</div>'
             f'<div class="m">Archivo <span class="badge {cls}">{txt}</span> '
-            f"{escape(v.archivo.motivo)}</div></div>"
+            f"{escape(v.archivo.motivo)}</div></div></div>"
             f'<div class="r">{usd(v.precio) if v.precio is not None else "—"}</div></div></div>')
     obras = "".join(
         f'<div class="card"><div class="t">Obra {escape(o.get("obra_id", ""))}: '
@@ -465,12 +533,13 @@ def producto(f, fuentes, now: datetime, banner: str = "") -> str:
     avisos = "".join(f'<div class="card alert"><div class="m w">{escape(a)}</div></div>'
                      for a in _ficha_avisos(f))
     tienda = (f' · <a href="{escape(p.url)}" rel="noopener">ver en la tienda</a>' if p.url else "")
+    contenido = _contenido_producto(p, shop.actualizado)
     body = (
         f'<p class="sub"><a href="/catalogo">← Catálogo</a></p><h1>{escape(p.titulo)}</h1>'
         f'<p class="sub">{escape(LINEA.get(p.linea, p.linea))} · {escape(CANAL.get(p.canal, p.canal))}'
         f" · {escape(ESTADO_LISTADO.get(p.estado, p.estado))}{tienda}. "
         f"Shopify actualizado {fecha(shop.actualizado)} ({hace(shop.actualizado, now)}).</p>"
-        f"{avisos}<h2>Obra</h2>{obras}<h2>Variantes ({len(f.variantes)})</h2>"
+        f"{avisos}{contenido}<h2>Obra</h2>{obras}<h2>Variantes ({len(f.variantes)})</h2>"
         f"{''.join(rows)}"
         '<p class="legend">Precio e imprenta: Shopify (ubicación de inventario de cada variante). '
         "Coste: cotización en Variantes.costo_usd (impresión + envío a EUA), estimado. Margen "

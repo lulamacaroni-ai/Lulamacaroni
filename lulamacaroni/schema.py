@@ -154,6 +154,8 @@ TABS: tuple[Tab, ...] = (
             "listado_ref", "sku", "linea", "canal", "id_en_canal", "titulo_en_canal", "url",
             "precio", "inventario", "estado", "aprobacion_id", "ultima_sync",
             "id_producto_canal", "ruta_pod",
+            # real content from the channel; images are links to its CDN, never copies
+            "imagen_url", "descripcion", "etiquetas", "tipo_producto", "imagenes_producto",
         ),
         validaciones={"linea": LINEAS, "canal": CANALES, "estado": ESTADOS_LISTADO,
                       "ruta_pod": RUTAS_LISTADO},
@@ -174,6 +176,8 @@ TABS: tuple[Tab, ...] = (
             "utm_campana", "referente",
             # the buyer, as a Clientes key (``shopify-cliente-<id>``); "" for a guest checkout
             "cliente_id",
+            # the line item's image on the channel's CDN (a link, never a copy)
+            "imagen_url",
         ),
         validaciones={
             "linea": LINEAS, "canal": CANALES, "estado": ESTADOS_PEDIDO, "ruta_pod": RUTAS_POD,
