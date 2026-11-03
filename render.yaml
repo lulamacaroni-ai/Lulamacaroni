@@ -1,0 +1,23 @@
+# Render Blueprint: the back office as one password-protected web service.
+# Steps: docs/hosting.md. Secret values are typed in Render's dashboard, never here.
+services:
+  - type: web
+    name: lulamacaroni-backoffice
+    runtime: python
+    plan: free            # sleeps after ~15 min idle; "starter" stays awake
+    branch: mvp
+    autoDeploy: true
+    buildCommand: pip install ".[google]"
+    startCommand: python -m lulamacaroni.app.server --host 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: PRODIGI_ENV
+        value: live
+      - key: LULA_TZ
+        value: America/Mexico_City
+      # Asked for when the Blueprint is created (sync: false = secret, typed in the dashboard)
+      - key: LULA_APP_PASSWORD
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON_B64
+        sync: false
