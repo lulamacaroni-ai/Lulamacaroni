@@ -1,7 +1,7 @@
 """HTML for the back office screens (Mexican Spanish, phone first, works on desktop).
 
 Pure functions: data in, one HTML string out. Everything shown is escaped. Layout and
-colors follow the UX map (cream ground, ink text, amber accent, Space Grotesk titles).
+colors come from Lore's artwork in the store; DM Sans, the storefront's font.
 """
 
 from __future__ import annotations
@@ -66,20 +66,25 @@ def icono(nombre: str) -> str:
 
 
 CSS = """
-:root{--bg:#F7F3EC;--card:#FFFFFF;--ink:#1C1C1E;--muted:#5A5A60;--line:#E6DDD0;
---accent:#8A4B00;--accent-soft:#F6E9D6;--accent-ink:#FFFFFF;--warn:#8A1C0C;--warn-bg:#FBEAE6;
---ok:#1E6A3E;--ok-bg:#E6F3EA;--amber-bg:#FCEBC0;--amber:#5C4000;--chip:#F0EDE8;--no:#9b2c2c;
---side:#1F1A16;--side-ink:#EDE6DD;--side-muted:#A39684;--side-hover:#2E2721;--side-on:#3A3028;
---shadow:0 1px 2px rgba(40,28,10,.05),0 2px 8px rgba(40,28,10,.04);--r:14px;--sidew:236px}
-@media (prefers-color-scheme:dark){:root{--bg:#141210;--card:#1E1B18;--ink:#F1ECE6;
---muted:#B5ACA2;--line:#342E28;--accent:#E7A35A;--accent-soft:#3A2B1A;--accent-ink:#1C1C1E;
---warn:#F0A090;--warn-bg:#3A201B;--ok:#86C99A;--ok-bg:#1D3326;--amber-bg:#3D3115;--amber:#F2D58A;
---chip:#2A2622;--no:#e58b8b;--side:#0E0C0B;--side-hover:#1C1815;--side-on:#2A221B;
+:root{
+/* Palette taken from Lore's artwork in the Shopify store (cherry red, olive, ochre, parchment, teal).
+   Links use deep ochre so cherry red stays for the brand and warnings read as warnings. */
+--cereza:#9C0F0C;--olivo:#364422;--ocre:#CC842E;--pergamino:#E8D2B2;--azulejo:#1F5C5E;
+--bg:#F6EFE3;--card:#FFFDF8;--ink:#2B1A12;--muted:#6A5644;--line:#E6D8C2;
+--accent:#8A4F12;--accent-soft:#F4E4CC;--accent-ink:#FFFFFF;--warn:#8E120E;--warn-bg:#F9E2DC;
+--ok:#3F5221;--ok-bg:#E8EDD9;--amber-bg:#F7E5C4;--amber:#6E4710;--chip:#EFE6D6;--no:#8E120E;
+--side:#2C3520;--side-ink:#F2EADB;--side-muted:#B8B096;--side-hover:#38432A;--side-on:#435032;
+--side-mark:var(--ocre);
+--shadow:0 1px 2px rgba(43,26,18,.05),0 2px 8px rgba(43,26,18,.05);--r:14px;--sidew:236px}
+@media (prefers-color-scheme:dark){:root{--bg:#16120D;--card:#201A14;--ink:#F3EBDD;
+--muted:#BDAE98;--line:#3A3026;--accent:#E0A85A;--accent-soft:#3A2C18;--accent-ink:#1C1C1E;
+--warn:#F29A8C;--warn-bg:#3B1D18;--ok:#A9C27E;--ok-bg:#27311A;--amber-bg:#3A2C14;--amber:#EBC27A;
+--chip:#2B241C;--no:#F29A8C;--side:#151A10;--side-hover:#222919;--side-on:#2E3722;--side-mark:#E0A85A;
 --shadow:none}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);
-font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+font:15px/1.5 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 img{max-width:100%;height:auto}
 .ico{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;
@@ -91,11 +96,10 @@ stroke-linecap:round;stroke-linejoin:round}
 color:var(--side-ink);display:flex;flex-direction:column;overflow-y:auto;z-index:20}
 .brand{display:flex;align-items:center;gap:10px;padding:20px 18px 14px;color:var(--side-ink)}
 .brand:hover{text-decoration:none}
-.brand .mark{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;
-display:grid;place-items:center;font:700 15px/1 "Space Grotesk",system-ui,sans-serif}
-@media (prefers-color-scheme:dark){.brand .mark{color:#1C1C1E}}
-.brand .name{font:700 1.05rem/1.1 "Space Grotesk",system-ui,sans-serif;letter-spacing:-.01em}
-.brand .name small{display:block;font:500 .7rem/1.3 Inter,system-ui,sans-serif;color:var(--side-muted);
+.brand .mark{width:34px;height:34px;border-radius:10px;background:var(--cereza);color:#fff;
+display:grid;place-items:center;font:700 15px/1 "DM Sans",system-ui,sans-serif}
+.brand .name{font:700 1.05rem/1.1 "DM Sans",system-ui,sans-serif;letter-spacing:-.01em}
+.brand .name small{display:block;font:500 .7rem/1.3 "DM Sans",system-ui,sans-serif;color:var(--side-muted);
 letter-spacing:.02em}
 .side nav{padding:4px 10px 16px;flex:1}
 .side .grp{font-size:.66rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
@@ -103,8 +107,8 @@ color:var(--side-muted);margin:16px 10px 6px}
 .side nav a{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:9px;
 color:var(--side-ink);opacity:.82;font-size:.9rem;font-weight:500;min-height:40px}
 .side nav a:hover{background:var(--side-hover);opacity:1;text-decoration:none}
-.side nav a.on{background:var(--side-on);opacity:1;font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
-.side nav a.on .ico{color:var(--accent)}
+.side nav a.on{background:var(--side-on);opacity:1;font-weight:600;box-shadow:inset 3px 0 0 var(--side-mark)}
+.side nav a.on .ico{color:var(--side-mark)}
 .side .foot{padding:14px 18px 18px;font-size:.72rem;color:var(--side-muted);border-top:1px solid var(--side-hover)}
 .top{display:none}
 .side .close{display:none;position:absolute;top:14px;right:10px;width:40px;height:40px;place-items:center;
@@ -133,7 +137,7 @@ main{max-width:1120px;margin:0 auto;padding:28px 32px 56px}
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
 
 /* --- type ----------------------------------------------------------------------------- */
-h1{font-family:"Space Grotesk",system-ui,sans-serif;font-size:1.85rem;line-height:1.15;
+h1{font-family:"DM Sans",system-ui,sans-serif;font-size:1.85rem;line-height:1.15;
 letter-spacing:-.02em;margin:2px 0 6px}
 h2{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
 font-weight:700;margin:30px 0 10px;display:flex;align-items:center;gap:10px}
@@ -161,7 +165,7 @@ padding:7px 15px;font-size:.85rem;font-weight:500;min-height:38px;display:inline
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
 display:flex;flex-direction:column;gap:3px;min-width:0;box-shadow:var(--shadow)}
 .kpi .lbl{font-size:.78rem;color:var(--muted);font-weight:500}
-.kpi .val{font:600 1.55rem/1.2 "Space Grotesk",system-ui,sans-serif;letter-spacing:-.01em;
+.kpi .val{font:600 1.55rem/1.2 "DM Sans",system-ui,sans-serif;letter-spacing:-.01em;
 font-variant-numeric:tabular-nums;margin:2px 0}
 .kpi .val.missing{color:var(--muted)}
 .kpi .foot{font-size:.76rem;color:var(--muted)}
@@ -212,7 +216,7 @@ background:var(--bg);color:var(--ink);font:inherit}
 input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px}
 button{flex:1;padding:12px;border:0;border-radius:10px;color:#fff;cursor:pointer;font:inherit;font-weight:600}
 button:hover{filter:brightness(1.08)}
-button.ok{background:#2f6b3a}button.no{background:#9b2c2c}
+button.ok{background:#4A5E2A}button.no{background:var(--cereza)}
 a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 .pr{display:flex;gap:10px;align-items:flex-start;min-width:0}
 .ph{flex:0 0 auto;width:72px;height:72px;border-radius:8px;background:var(--chip);
@@ -322,8 +326,8 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
         "<meta name='robots' content='noindex'>"
         "<link rel='preconnect' href='https://fonts.googleapis.com'>"
         "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>"
-        "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700"
-        "&family=Space+Grotesk:wght@500;600;700&display=swap'>"
+        "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=DM+Sans:"
+        "ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap'>"
         f"<title>{escape(titulo)} · Lula Macaroni</title><style>{CSS}</style></head>"
         "<body><div class='layout'>"
         "<input type='checkbox' id='menu' aria-label='Abrir menú'>"
@@ -341,21 +345,21 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
 # --- Portada (landing page) ------------------------------------------------------------------
 
 PORTADA_CSS = """
-:root{--paper:#F4EBD9;--ink:#1C1C1E;--muted:#5A5A60;--red:#9E1B22;--side:#1F1A16}
-@media (prefers-color-scheme:dark){:root{--paper:#171411;--ink:#F1ECE6;--muted:#B5ACA2;--red:#E0626A}}
+:root{--paper:#F4EBD9;--ink:#2B1A12;--muted:#6A5644;--red:#9C0F0C}
+@media (prefers-color-scheme:dark){:root{--paper:#16120D;--ink:#F3EBDD;--muted:#BDAE98;--red:#EE7A6A}}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--paper);color:var(--ink);
-font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+font:15px/1.5 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 .portada{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
 gap:22px;padding:24px 16px 32px;text-align:center}
-.portada .banner{background:#FCEBC0;color:#5C4000;border-radius:10px;padding:8px 14px;font-size:.85rem}
+.portada .banner{background:#F7E5C4;color:#6E4710;border-radius:10px;padding:8px 14px;font-size:.85rem}
 .portada figure{margin:0;display:flex;justify-content:center;width:100%}
 /* the art is shown whole: never cropped, never stretched */
 .portada img{display:block;width:auto;height:auto;max-width:min(100%,560px);max-height:72vh;
 object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(60,30,10,.18)}
-.portada .marca{font:700 1.35rem/1.1 "Space Grotesk",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
-.portada .marca small{display:block;font:500 .78rem/1.4 Inter,system-ui,sans-serif;color:var(--muted);margin-top:4px}
+.portada .marca{font:700 1.35rem/1.1 "DM Sans",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+.portada .marca small{display:block;font:500 .78rem/1.4 "DM Sans",system-ui,sans-serif;color:var(--muted);margin-top:4px}
 .portada .entrar{display:inline-flex;align-items:center;gap:10px;background:var(--red);color:#fff;
 padding:13px 26px;border-radius:999px;font-weight:600;font-size:1rem;text-decoration:none;
 box-shadow:0 4px 14px rgba(158,27,34,.28);min-height:48px}
@@ -374,8 +378,8 @@ def portada(con_imagen: bool, banner: str = "") -> str:
         "<!doctype html><html lang='es-MX'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='robots' content='noindex'>"
-        "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600"
-        "&family=Space+Grotesk:wght@600;700&display=swap'>"
+        "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=DM+Sans:"
+        "opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap'>"
         f"<title>Bienvenida · Lula Macaroni</title><style>{PORTADA_CSS}</style></head>"
         f"<body><main class='portada'>{ban}{img}"
         "<p class='marca'>Lula Macaroni<small>Oficina del estudio</small></p>"
