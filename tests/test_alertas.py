@@ -133,7 +133,7 @@ def test_alerts_page_and_home_show_source_and_escape(tmp_path, store):
     html = render("/alertas", {}, d)
     assert "Fuente: Shopify" in html and "&lt;b&gt;" in html and "<b>x</b>" not in html
     assert "Fuentes aún no conectadas" in html
-    home = render("/", {}, d)
+    home = render("/inicio", {}, d)
     assert "Qué requiere tu atención" in home and "Hoy por canal y contabilidad" in home
     assert "Ventas Etsy" in home and "falta el dato" in home
 

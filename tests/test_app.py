@@ -122,7 +122,7 @@ def test_catalog_groups_variants_and_flags_missing_skus():
 # --- screens -----------------------------------------------------------------------------
 
 @pytest.mark.parametrize("path,needle", [
-    ("/", "Hola, Lore"), ("/pedidos", "Necesitan atención"), ("/catalogo", "Catálogo"),
+    ("/inicio", "Hola, Lore"), ("/pedidos", "Necesitan atención"), ("/catalogo", "Catálogo"),
     ("/fuentes", "sin conectar"), ("/aprobar", "Aprobaciones"), ("/alertas", "Urgente"),
 ])
 def test_every_screen_renders(book, store, path, needle):
@@ -131,7 +131,7 @@ def test_every_screen_renders(book, store, path, needle):
 
 
 def test_missing_numbers_show_a_dash_not_zero(book, store):
-    html = render("/", {"p": "30"}, Datos(book, store, NOW))
+    html = render("/inicio", {"p": "30"}, Datos(book, store, NOW))
     assert "falta el dato" in html and "¿De dónde sale?" in html
     assert render("/nope", {}, Datos(book, store, NOW)) is None
 
@@ -156,3 +156,16 @@ def test_prodigi_source_reads_the_key_like_the_connector(monkeypatch):
     monkeypatch.setenv("PRODIGI_ENV", "live")
     monkeypatch.setenv("PRODIGI_API_KEY", "y")
     assert estado_fuentes([], now)["prodigi"].nota == "llave de live lista; aún sin sincronizar costos"
+
+
+def test_root_is_the_welcome_page_with_a_way_in(book, store):
+    from lulamacaroni.app import views
+
+    html = render("/", {}, Datos(book, store, NOW), banner="Datos de ejemplo")
+    assert "href='/inicio'" in html and "Entrar" in html and "Datos de ejemplo" in html
+    assert "/inicio?p=" not in html  # it is not Inicio itself
+    # old Inicio links (/?p=30) still open Inicio
+    assert "Hola, Lore" in render("/", {"p": "30"}, Datos(book, store, NOW))
+    # the art is never cropped or stretched, and the page still works without it
+    assert "object-fit:contain" in views.PORTADA_CSS and "width:auto;height:auto" in views.PORTADA_CSS
+    assert "<img" in views.portada(True) and "<img" not in views.portada(False)
