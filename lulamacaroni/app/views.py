@@ -277,11 +277,7 @@ border-radius:50%;background:var(--motivo) center/contain no-repeat;opacity:.95}
 
 /* --- the puppy (Lore's art, cut out of its background, never cropped or stretched) ------ */
 .perrito{position:fixed;top:0;left:0;z-index:19;pointer-events:none;width:var(--perro,76px)}
-.perrito .bote,.perrito .giro{display:block}
 .perrito img{display:block;width:100%;height:auto;filter:drop-shadow(0 2px 3px rgba(43,26,18,.25))}
-.perrito .uy{position:absolute;left:62%;top:-26px;background:var(--card);color:var(--ink);
-border:1px solid var(--line);border-radius:10px;padding:1px 7px;font:700 .8rem/1.4 "DM Sans",system-ui,sans-serif;
-opacity:0;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.perrito{display:none}}
 """
 
@@ -360,23 +356,23 @@ def calidad(d: Dato) -> str:
     return f'<span class="q {d.calidad}">{label}</span>'
 
 
-# The puppy: now and then it peeks out from behind the menu, ducks back, then runs along the
-# top on four legs (a real dog's trot and gallop), trips on its sweater and rolls head over heels
-# off the right edge. The animation lives in static/perrito.js and, like the image, only loads on
-# the visits when it plays. Decoration only: it never blocks a click, is hidden from screen
-# readers and skips people who turn motion off. Add ?perrito=1 to any screen to see it.
+# The puppy: now and then, on Inicio, a dog pillow appears next to "Hola, Lore"; the puppy walks
+# out from behind the menu, turns round on the pillow twice, lies down facing forward and stays.
+# The animation lives in static/perrito.js and, like the image, only loads on the visits when it
+# plays. Decoration only: it never blocks a click, is hidden from screen readers and skips people
+# who turn motion off. Add ?perrito=1 to Inicio to see it.
 PERRITO_CADA_MIN = 20     # at most once per this many minutes per browser
 PERRITO_PROBABILIDAD = 0.35  # chance on a visit once that wait has passed (the first visit always plays)
 PERRITO_JS = (
     "(function(){var W=window,D=document;"
-    "if(!W.matchMedia||!D.body.animate||!W.requestAnimationFrame)return;"
-    "if(W.matchMedia('(prefers-reduced-motion: reduce)').matches)return;"
+    "if(!W.matchMedia||!D.body.animate)return;"
+    "if(W.matchMedia('(prefers-reduced-motion: reduce)').matches)return;if(!/^\\/(inicio)?$/.test(location.pathname))return;"
     "var forzar=/[?&]perrito=1/.test(location.search),ahora=Date.now(),ultimo=0;"
-    "try{ultimo=+localStorage.getItem('lula-perrito')||0}catch(e){}"
+    "try{ultimo=+localStorage.getItem('lula-perrito-cojin')||0}catch(e){}"
     "if(!forzar){if(D.documentElement.classList.contains('entrada'))return;"
     f"if(ultimo&&(ahora-ultimo<{PERRITO_CADA_MIN}*60000||Math.random()>{PERRITO_PROBABILIDAD}))return;}}"
-    "try{localStorage.setItem('lula-perrito',String(ahora))}catch(e){}"
-    "function go(){if(D.hidden)return;var s=D.createElement('script');s.src='/perrito.js';s.async=true;"
+    "try{localStorage.setItem('lula-perrito-cojin',String(ahora))}catch(e){}"
+    "function go(){if(D.getElementById('portada')){setTimeout(go,400);return}if(D.hidden)return;var s=D.createElement('script');s.src='/perrito.js';s.async=true;"
     "D.body.appendChild(s)}"
     "function listo(){setTimeout(go,forzar?600:2500)}"
     "if(D.readyState==='complete')listo();else W.addEventListener('load',listo);})();"
