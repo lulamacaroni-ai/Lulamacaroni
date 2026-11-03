@@ -21,5 +21,8 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["lulamacaroni*"]
 
+[tool.setuptools.package-data]
+"lulamacaroni.app" = ["static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

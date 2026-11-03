@@ -30,7 +30,7 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
 
 # Left-hand menu, grouped. Each entry: (path, label, icon key).
 NAV_GRUPOS = (
-    ("Hoy", (("/", "Inicio", "casa"), ("/alertas", "Alertas", "campana"),
+    ("Hoy", (("/inicio", "Inicio", "casa"), ("/alertas", "Alertas", "campana"),
              ("/aprobar", "Aprobar", "check"))),
     ("Tienda", (("/catalogo", "Catálogo", "cuadros"), ("/pedidos", "Pedidos", "caja"),
                 ("/clientes", "Clientes", "personas"))),
@@ -283,7 +283,7 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
             links.append(f'<a href="{h}"{cur}>{icono(ico)}<span>{escape(t)}</span></a>')
         grupos.append(f'<div class="grp">{escape(grupo)}</div>{"".join(links)}')
     ban = f'<div class="banner">{escape(banner)}</div>' if banner else ""
-    marca = ('<a class="brand" href="/"><span class="mark">LM</span>'
+    marca = ('<a class="brand" href="/inicio"><span class="mark">LM</span>'
              '<span class="name">Lula Macaroni<small>Oficina</small></span></a>')
     return (
         "<!doctype html><html lang='es-MX'><head><meta charset='utf-8'>"
@@ -304,6 +304,51 @@ def page(titulo: str, activo: str, body: str, banner: str = "") -> str:
         "<label for='menu' class='veil' aria-hidden='true'></label>"
         f"<div class='content'><main>{ban}{body}</main></div>"
         "</div></body></html>"
+    )
+
+
+# --- Portada (landing page) ------------------------------------------------------------------
+
+PORTADA_CSS = """
+:root{--paper:#F4EBD9;--ink:#1C1C1E;--muted:#5A5A60;--red:#9E1B22;--side:#1F1A16}
+@media (prefers-color-scheme:dark){:root{--paper:#171411;--ink:#F1ECE6;--muted:#B5ACA2;--red:#E0626A}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);
+font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.portada{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+gap:22px;padding:24px 16px 32px;text-align:center}
+.portada .banner{background:#FCEBC0;color:#5C4000;border-radius:10px;padding:8px 14px;font-size:.85rem}
+.portada figure{margin:0;display:flex;justify-content:center;width:100%}
+/* the art is shown whole: never cropped, never stretched */
+.portada img{display:block;width:auto;height:auto;max-width:min(100%,560px);max-height:72vh;
+object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(60,30,10,.18)}
+.portada .marca{font:700 1.35rem/1.1 "Space Grotesk",system-ui,sans-serif;letter-spacing:-.01em;margin:0}
+.portada .marca small{display:block;font:500 .78rem/1.4 Inter,system-ui,sans-serif;color:var(--muted);margin-top:4px}
+.portada .entrar{display:inline-flex;align-items:center;gap:10px;background:var(--red);color:#fff;
+padding:13px 26px;border-radius:999px;font-weight:600;font-size:1rem;text-decoration:none;
+box-shadow:0 4px 14px rgba(158,27,34,.28);min-height:48px}
+.portada .entrar:hover{filter:brightness(1.08)}
+.portada .entrar:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+@media (prefers-color-scheme:dark){.portada .entrar{color:#1C1C1E}}
+"""
+
+
+def portada(con_imagen: bool, banner: str = "") -> str:
+    """Welcome page shown on entering the app; one button into Inicio."""
+    ban = f'<div class="banner">{escape(banner)}</div>' if banner else ""
+    img = ('<figure><img src="/portada.png" alt="Oh, the places you\'ll go!" '
+           'width="1070" height="1470"></figure>') if con_imagen else ""
+    return (
+        "<!doctype html><html lang='es-MX'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<meta name='robots' content='noindex'>"
+        "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600"
+        "&family=Space+Grotesk:wght@600;700&display=swap'>"
+        f"<title>Bienvenida · Lula Macaroni</title><style>{PORTADA_CSS}</style></head>"
+        f"<body><main class='portada'>{ban}{img}"
+        "<p class='marca'>Lula Macaroni<small>Oficina del estudio</small></p>"
+        "<a class='entrar' href='/inicio'>Entrar →</a></main></body></html>"
     )
 
 
@@ -343,7 +388,7 @@ def inicio(res: Resumen, rd, fuentes: dict[str, EstadoFuente], now: datetime,
 
     per = res.periodo
     chips = "".join(
-        f'<a class="chip{" on" if k == per.clave else ""}" href="/?p={k}">{t}</a>'
+        f'<a class="chip{" on" if k == per.clave else ""}" href="/inicio?p={k}">{t}</a>'
         for k, t in (("hoy", "Hoy"), ("7", "7 días"), ("30", "30 días")))
     acc = "".join(f'<li><a href="{escape(a.enlace)}">{escape(a.accion)}</a></li>'
                   for a in rd.acciones)
@@ -369,7 +414,7 @@ def inicio(res: Resumen, rd, fuentes: dict[str, EstadoFuente], now: datetime,
         '<p class="legend"><a href="/fuentes">Fuentes</a>: 0 = cero real · — = falta el dato · '
         "~ = estimado. Toca “¿De dónde sale?” en cualquier número.</p>"
     )
-    return page("Inicio", "/", body, banner)
+    return page("Inicio", "/inicio", body, banner)
 
 
 # --- Alertas ----------------------------------------------------------------------------------
