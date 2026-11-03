@@ -192,6 +192,7 @@ def test_puppy_plays_now_and_then_on_screens_but_not_on_the_welcome_page(book, s
     d = Datos(book, store)
     inicio = render("/inicio", {}, d)
     assert "/perrito.js" in inicio and "lula-perrito" in inicio
+    assert "getElementById('portada')" in inicio  # waits for the welcome art to fade first
     assert "prefers-reduced-motion" in inicio  # no motion for people who turn it off
     assert "perrito=1" in inicio  # a way to see it on demand
     assert "perrito" not in views.portada(True)  # never on the welcome page
