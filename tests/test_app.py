@@ -205,23 +205,10 @@ def test_puppy_art_is_cut_out_but_never_stretched():
     from lulamacaroni.app.screens import PERRITO_JS
 
     js = PERRITO_JS.read_text(encoding="utf-8")
-    assert "1136 / 1246" in js and 'preserveAspectRatio: "xMidYMid meet"' in js  # never stretched
+    assert "width:100%;height:auto" in js  # drawn at its own proportions, never stretched
     assert "/perrito.js" in views.PERRITO_JS  # the animation loads only when it plays
+    assert "asoma" in js and "GALOPE" not in js  # only the peek; the run across the top is gone
 
-
-def test_running_dog_follows_a_real_gait():
-    from lulamacaroni.app import views
-    from lulamacaroni.app.screens import PERRITO_JS
-
-    js = PERRITO_JS.read_text(encoding="utf-8")
-    # trot (diagonal pairs) into a rotary gallop, planted paws matched to ground speed,
-    # a roll that turns by distance travelled, and a safety net that removes the dog
-    for clave in ("TROTE", "GALOPE", "apoyo", "sweep = clamp((v / u)", "dx / radio", "c.remove()"):
-        assert clave in js
-    assert "pointer-events:none" in views.CSS
-
-
-# --- details of Lore's paintings on every screen --------------------------------------------
 
 def test_every_screen_has_its_own_painting_detail(book, store):
     from lulamacaroni.app import arte
