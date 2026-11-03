@@ -77,6 +77,7 @@ class Datos:
 
 
 PORTADA = Path(__file__).with_name("static") / "portada.png"
+PERRITO = Path(__file__).with_name("static") / "perrito.png"  # the puppy, cut out of its background
 
 
 def es_portada(path: str, params: dict[str, str]) -> bool:
