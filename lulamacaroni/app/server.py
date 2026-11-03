@@ -29,11 +29,12 @@ from ..approval.store import JsonStore, SheetsStore, open_store
 from ..localbook import LocalWorkbook, open_workbook
 from ..workbook import Workbook
 from . import views
+from .arte import ARCHIVOS as ARTE
 from .screens import PERRITO, PORTADA, Datos, es_portada, render
 
 APPROVER = config.get("LULA_APPROVER", "Lorena")
 TEXT = "text/plain; charset=utf-8"
-IMAGENES = {"/portada.png": PORTADA, "/perrito.png": PERRITO}
+IMAGENES = {"/portada.png": PORTADA, "/perrito.png": PERRITO, **ARTE}
 
 
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
@@ -95,7 +96,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, "No encontrado", TEXT)
             data = archivo.read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "image/png")
+            tipo = "image/jpeg" if archivo.suffix == ".jpg" else "image/png"
+            self.send_header("Content-Type", tipo)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "private, max-age=86400")
             self.end_headers()

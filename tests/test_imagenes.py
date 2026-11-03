@@ -88,11 +88,13 @@ def _book(tmp_path):
 def test_catalog_and_product_page_show_real_content(tmp_path):
     d = Datos(_book(tmp_path), JsonStore(tmp_path / "a.json"), NOW)
     cat = render("/catalogo", {}, d)
-    assert f"{CDN}cover.jpg?v=1&amp;width=240" in cat
+    assert f"{CDN}cover.jpg?v=1&amp;width=800" in cat and 'class="ph xl"' in cat  # large card
     det = render("/catalogo/producto", {"c": "shopify", "id": "1"}, d)
     assert "En la tienda" in det and "<p>Second paragraph.</p>" in det
     assert "floral, gift" in det and "Art print" in det and "Fuente: Shopify" in det
-    assert f"{CDN}room.jpg?v=1&amp;width=160" in det          # gallery
+    assert f"{CDN}cover.jpg?v=1&amp;width=1600" in det and 'class="ph cover"' in det  # big cover
+    assert det.index('class="ph cover"') < det.index("En la tienda")  # the art comes first
+    assert f"{CDN}room.jpg?v=1&amp;width=320" in det          # gallery
     assert f"{CDN}framed-12x16.jpg?v=1&amp;width=160" in det  # variant mockup
 
 
