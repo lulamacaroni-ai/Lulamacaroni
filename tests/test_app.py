@@ -205,9 +205,12 @@ def test_puppy_art_is_cut_out_but_never_stretched():
     from lulamacaroni.app.screens import PERRITO_JS
 
     js = PERRITO_JS.read_text(encoding="utf-8")
-    assert "width:100%;height:auto" in js  # drawn at its own proportions, never stretched
+    assert "1136 / 1246" in js and 'preserveAspectRatio: "xMidYMid meet"' in js  # never stretched
     assert "/perrito.js" in views.PERRITO_JS  # the animation loads only when it plays
-    assert "asoma" in js and "GALOPE" not in js  # only the peek; the run across the top is gone
+    # the dog walks to a pillow by the greeting, turns round twice and lies down facing forward
+    for clave in ("main h1", "PASO", "VUELTAS", "echarse", "iterations: Infinity"):
+        assert clave in js
+    assert "inicio)?$" in views.PERRITO_JS  # only on Inicio, next to "Hola, Lore"
 
 
 def test_every_screen_has_its_own_painting_detail(book, store):
