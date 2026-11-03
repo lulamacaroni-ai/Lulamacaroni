@@ -151,35 +151,60 @@
   function linea(path, x1, y1, x2, y2) { path.setAttribute("d", "M" + x1 + " " + y1 + "L" + x2 + " " + y2); }
   var RAD = Math.PI / 180;
 
+  // Smooth looping curve through keyframes [[phase, value], ...] (Catmull-Rom, phase 0..1).
+  function curva(K, p) {
+    var n = K.length, i = n - 1;
+    for (var j = 0; j < n; j++) if (K[j][0] > p) { i = (j + n - 1) % n; break; }
+    var a = K[i][0], b2 = i + 1 < n ? K[i + 1][0] : K[0][0] + 1, q = p < a ? p + 1 : p;
+    var f = (q - a) / (b2 - a);
+    var p0 = K[(i + n - 1) % n][1], p1 = K[i][1], p2 = K[(i + 1) % n][1], p3 = K[(i + 2) % n][1];
+    return 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f);
+  }
+  // Angle of the lowest bone over one stride, from touchdown (0) through toe-off (PASO.apoyo) and
+  // the swing, in degrees from straight down (positive = paw ahead of the joint). Shapes follow
+  // published walking kinematics of dogs: the carpus extends a little under load, folds hard
+  // (about 90°) just after the paw leaves the ground, then opens to reach; the hock yields at
+  // touchdown, extends to push off, flexes through early swing and opens before landing.
+  var ANG_DEL = [[0, 6], [0.3, 14], [0.55, 4], [0.62, -16], [0.72, -92], [0.84, -42], [0.94, 12]];
+  var ANG_TRAS = [[0, 18], [0.15, 27], [0.45, 14], [0.62, -6], [0.75, -44], [0.88, 4], [0.96, 22]];
+
   // One frame of the body. fase: stride phase; sweep: how far a planted paw travels (units);
-  // echado: 0 standing .. 1 lying (legs folded, body lowered); giro: facing, -1..1 (side-on at ±1,
-  // seen end-on near 0). Returns where the head sits, in drawing units.
-  function postura(fase, sweep, echado, giro) {
-    var bob = -1.4 * Math.cos(4 * Math.PI * fase) * (1 - echado) + 22 * echado;
-    var hom = { x: HOMBRO.x, y: HOMBRO.y + bob }, cad = { x: CADERA.x, y: CADERA.y + bob };
+  // eT / eD: hind and front ends lowered, 0 standing .. 1 lying (a dog sits first, then walks its
+  // front paws out); giro: facing, -1..1 (side-on at ±1, seen end-on near 0); quieto: 0 walking
+  // .. 1 standing square; baja: head lowered to sniff. Returns where the head sits.
+  function postura(fase, sweep, eT, eD, giro, quieto, baja) {
+    var echado = (eT + eD) / 2, b = PASO.apoyo, carga = {}, golpe = 0;
     ["LH", "RH", "LF", "RF"].forEach(function (k) {
-      var tr = k.charAt(1) === "H", L = tr ? TRAS : DEL, pp = frac(fase - PASO[k]), b = PASO.apoyo;
+      var pp = frac(fase - PASO[k]);
+      carga[k] = pp < b ? Math.sin(Math.PI * pp / b) : 0;
+      if (k.charAt(1) === "F" && pp < 0.22) golpe += Math.sin(Math.PI * pp / 0.22);   // front paw lands
+    });
+    var anda = 1 - quieto;
+    // each girdle vaults over its planted legs (highest at mid-stance), as in a real walk
+    var subeD = -1.3 * (carga.LF + carga.RF - 0.64) * anda, subeT = -1.3 * (carga.LH + carga.RH - 0.64) * anda;
+    var hom = { x: HOMBRO.x, y: HOMBRO.y + subeD * (1 - eD) + 22 * eD };
+    var cad = { x: CADERA.x, y: CADERA.y + subeT * (1 - eT) + 22 * eT };
+    ["LH", "RH", "LF", "RF"].forEach(function (k) {
+      var tr = k.charAt(1) === "H", L = tr ? TRAS : DEL, pp = frac(fase - PASO[k]), e = tr ? eT : eD;
       var raiz = tr ? { x: cad.x + 2, y: cad.y - 4 } : { x: hom.x + 2, y: hom.y - 4 };
       // the far-side legs stand on a farther line of the ground, so they sit a little higher;
       // seen end-on (turning) the two sides spread further apart
-      var lejos = k.charAt(0) === "L" ? (3 + 7 * (1 - Math.abs(giro))) * (1 - echado) : 0;
+      var lejos = k.charAt(0) === "L" ? (3 + 7 * (1 - Math.abs(giro))) * (1 - e) : 0;
       raiz.y -= lejos;
-      var px, py, ang;   // paw position, and the angle of the lowest bone (degrees from straight
-                         // down; positive = paw ahead of the wrist or hock)
+      var px, py, ang = curva(tr ? ANG_TRAS : ANG_DEL, pp);
       if (pp < b) {      // stance: paw planted, the body passes over it
         px = raiz.x + sweep / 2 - sweep * pp / b; py = SUELO;
-        ang = tr ? 24 : 8;   // the hock sits behind and above the paw; the pastern slopes a little
-      } else {           // swing: lift, fold and reach forward
-        var q = (pp - b) / (1 - b), e = q - Math.sin(2 * Math.PI * q) / (2 * Math.PI), s1 = Math.sin(Math.PI * q);
-        px = raiz.x - sweep / 2 + sweep * e; py = SUELO - (tr ? 8 : 10) * s1;
-        if (tr) ang = 24 - 70 * s1 * (1 - q) + 20 * s1 * q;           // hock flexes: paw trails, then reaches
-        else ang = q < 0.6 ? 8 - 115 * Math.sin(Math.PI * q / 0.6)    // wrist folds: paw tucks up behind
-                           : 8 + 14 * Math.sin(Math.PI * (q - 0.6) / 0.4);   // then the leg reaches forward
+      } else {           // swing: lift (front paws higher than hind), and reach forward
+        var q = (pp - b) / (1 - b), av = q - Math.sin(2 * Math.PI * q) / (2 * Math.PI);
+        px = raiz.x - sweep / 2 + sweep * av;
+        py = SUELO - (tr ? 8 : 11) * Math.sin(Math.PI * Math.pow(q, tr ? 0.85 : 0.75));
       }
-      // lying down: front legs stretched forward along the pillow, hind legs folded under
+      // standing still: every paw under its joint
+      px = lerp(px, raiz.x + (tr ? 1 : 0), quieto); py = lerp(py, SUELO, quieto); ang = lerp(ang, tr ? 20 : 6, quieto);
       py -= lejos;
-      px = lerp(px, tr ? raiz.x + 12 : raiz.x + 20, echado); py = lerp(py, SUELO - 2, echado);
-      ang = lerp(ang, tr ? 80 : 85, echado);
+      // lying down: hind legs folded under (hocks flat on the bed), front legs stretched forward
+      px = lerp(px, tr ? raiz.x + 12 : raiz.x + 20, e); py = lerp(py, SUELO - 2, e);
+      ang = lerp(ang, tr ? 80 : 85, e);
       var jx = px - L.c * Math.sin(ang * RAD), jy = py - L.c * Math.cos(ang * RAD);   // wrist or hock
       var s = ik(raiz.x, raiz.y, jx, jy, L.a, L.b, tr ? -1 : 1), leg = P[k];
       linea(leg.sup, raiz.x, raiz.y, s.kx, s.ky);    // humerus / femur
@@ -190,24 +215,28 @@
     var top = Math.min(hom.y, cad.y) - 32;
     torso.setAttribute("d",
       "M" + (cad.x - 14) + " " + (cad.y + 2) +
-      "C" + (cad.x - 16) + " " + (cad.y - 22) + " " + (cad.x + 10) + " " + top + " " + ((cad.x + hom.x) / 2) + " " + top +
-      "C" + (hom.x - 6) + " " + top + " " + (hom.x + 30) + " " + (hom.y - 30) + " " + (hom.x + 30) + " " + (hom.y + 4) +
+      "C" + (cad.x - 16) + " " + (cad.y - 22) + " " + (cad.x + 10) + " " + (cad.y - 32) + " " + ((cad.x + hom.x) / 2) + " " + top +
+      "C" + (hom.x - 6) + " " + (hom.y - 32) + " " + (hom.x + 30) + " " + (hom.y - 30) + " " + (hom.x + 30) + " " + (hom.y + 4) +
       "C" + (hom.x + 28) + " " + (hom.y + 16) + " " + (cad.x - 4) + " " + (cad.y + 16) + " " + (cad.x - 14) + " " + (cad.y + 2) + "Z");
     torsoLuz.setAttribute("d", torso.getAttribute("d"));
     ancas.setAttribute("cx", cad.x - 2); ancas.setAttribute("cy", cad.y - 6);
     cola.setAttribute("transform", "translate(" + (cad.x - 16) + " " + (cad.y - 22) + ") rotate(" +
-      (Math.sin(2 * Math.PI * fase * 1.5) * 16) + ")");
+      (Math.sin(2 * Math.PI * fase * 1.5) * 16 * (1 - eT * 0.7)) + ")");
     // facing: squeeze the body around the head's line so it turns behind the head
-    var piv = lerp(CENTRO, CABEZA_X, echado);
+    var piv = lerp(CENTRO, CABEZA_X, eD);
     cuerpo.setAttribute("transform", "translate(" + piv + " 0) scale(" + giro + " 1) translate(" + (-piv) + " 0)");
     var ag = Math.abs(giro), mitad = piv + giro * (CENTRO - piv);
     sombra.setAttribute("cx", lerp(mitad, piv + giro * (CABEZA_X - 18 - piv), echado));
     sombra.setAttribute("cy", SUELO + 1 - 2 * (1 - ag) * (1 - echado));
-    sombra.setAttribute("rx", lerp(30 + 22 * ag, 46, echado) * (1 + 0.04 * bob * (1 - echado)));
+    sombra.setAttribute("rx", lerp(30 + 22 * ag, 46, echado) * (1 - 0.03 * (subeD + subeT)));
     sombra.setAttribute("ry", lerp(4 + 6 * (1 - ag), 7, echado));
-    // the head rides the shoulders a beat late, nodding slightly with each step
-    var nod = Math.sin(4 * Math.PI * fase - 0.9) * (1 - echado);
-    return { x: piv + giro * (CABEZA_X - piv), y: hom.y - 6 - bob * 0.5 + 0.8 * nod + 30 * echado, r: 1.6 * nod * (giro < 0 ? -1 : 1) };
+    // the head dips as each front paw takes the weight (the nod vets watch for), and drops to sniff
+    var nod = golpe * anda * (1 - eD), dir = giro < 0 ? -1 : 1;
+    return {
+      x: piv + giro * (CABEZA_X - piv) + dir * 6 * baja,
+      y: hom.y - 6 - subeD * 0.4 * (1 - eD) + 1.8 * nod + 13 * baja + 8 * eD,
+      r: dir * (2 * nod + 8 * baja),
+    };
   }
   function cabezaEn(c) {
     cabeza.setAttribute("transform", "translate(" + c.x + " " + c.y + ") rotate(" + (c.r || 0) + " 0 -10)");
@@ -216,52 +245,62 @@
   // ---- motion --------------------------------------------------------------------------------
   var arriba = piso - SUELO * u;                      // div top so the paws stand on the pillow line
   var meta = almCx - CENTRO * u;                      // body centred over the pillow
-  var x = x0 - wpx, v = 0, VEL = clamp(ancho * 0.09, 90, 125), fase = 0, t = 0, antes = null;
-  var aplasto = false, estado = "camina", tEstado = 0, R = almW * 0.17;
-  var VUELTAS = 2, T_VUELTAS = 2.8, T_ECHARSE = 1.2;
-  var HZ = 2.6;                                       // a small dog's brisk walk
+  // A small dog walks at about 1.9 strides a second; its speed is set so planted paws never slide.
+  var HZ = 1.9, VEL = clamp(ancho * 0.065, 64, 86);
+  var x = x0 - wpx, v = 0, fase = 0, t = 0, antes = null;
+  var aplasto = false, estado = "camina", tEstado = 0, R = almW * 0.13;
+  var T_OLFATEA = 1.1, VUELTAS = 2, T_VUELTAS = 3.4, T_ECHARSE = 1.9;
 
   function coloca(px, py, escala, inclina) {
     caja.style.left = px + "px"; caja.style.top = py + "px";
     caja.style.transform = (escala === 1 ? "" : "scale(" + escala + ") ") + (inclina ? "rotate(" + inclina + "deg)" : "");
   }
+  function cambia(s) { estado = s; tEstado = t; }
 
   function cuadro(ahora) {
     if (antes == null) antes = ahora;
     var dt = Math.min(0.05, (ahora - antes) / 1000); antes = ahora; t += dt;
-    var sweep;
+    var k, hz;
     if (estado === "camina") {
       var resta = meta - x;
-      v = Math.min(VEL * Math.min(1, 0.2 + t / 0.4), VEL * clamp(resta / 60, 0.25, 1));   // ease in and out
+      v = Math.min(VEL * Math.min(1, 0.25 + t / 0.6), VEL * clamp(resta / 50, 0.2, 1));   // ease in and out
       x = Math.min(meta, x + v * dt);
-      fase = frac(fase + HZ * (0.35 + 0.65 * v / VEL) * dt);
-      sweep = clamp((v / u) * PASO.apoyo / (HZ * (0.35 + 0.65 * v / VEL)), 0, 46);
-      cabezaEn(postura(fase, sweep, 0, 1));
+      hz = HZ * (0.45 + 0.55 * v / VEL);              // slower steps when it slows down
+      fase = frac(fase + hz * dt);
+      var parar = clamp(1 - resta / 25, 0, 1);         // squares up its legs as it arrives
+      cabezaEn(postura(fase, clamp((v / u) * PASO.apoyo / hz, 0, 44), 0, 0, 1, suave(parar), 0));
       coloca(x, arriba, 1);
-      if (meta - x < 0.5) { estado = "vueltas"; tEstado = t; }
+      if (resta < 0.5) cambia("olfatea");
+    } else if (estado === "olfatea") {
+      // stops, puts its nose down to the bed, then looks up
+      k = clamp((t - tEstado) / T_OLFATEA, 0, 1);
+      cabezaEn(postura(fase, 0, 0, 0, 1, 1, Math.sin(Math.PI * k)));
+      if (k >= 1) cambia("vueltas");
     } else if (estado === "vueltas") {
-      // turning round on the pillow: a small loop seen from the side; the body faces the way it
-      // walks (side-on at the front and back of the loop, end-on at the sides)
-      var k = clamp((t - tEstado) / T_VUELTAS, 0, 1);
+      // turning round on the bed, nose low: a tight loop seen from the side; the body faces the way
+      // it walks (side-on at the front and back of the loop, end-on at the sides)
+      k = clamp((t - tEstado) / T_VUELTAS, 0, 1);
       var theta = 2 * Math.PI * VUELTAS * suave(k);
       var cz = Math.cos(theta), giro = (cz < 0 ? -1 : 1) * Math.max(0.28, Math.abs(cz));
-      fase = frac(fase + HZ * 0.8 * dt);
-      cabezaEn(postura(fase, 16, 0, giro));
+      var arranque = suave(k * 6) * suave((1 - k) * 6);   // steps start and stop with the loop
+      fase = frac(fase + HZ * 0.9 * dt * arranque);
+      cabezaEn(postura(fase, 18 * arranque, 0, 0, giro, 1 - arranque, 0.35 * arranque));
       // nearer the viewer at the front of the loop: lower and bigger; farther at the back;
       // leaning into the turn while it moves across
       coloca(meta + R * Math.sin(theta), arriba - 5 * (1 - cz), 0.9 + 0.1 * cz,
         -3.5 * Math.sin(theta) * Math.sin(Math.PI * k));
-      if (k >= 1) { estado = "echarse"; tEstado = t; }
+      if (k >= 1) cambia("echarse");
     } else {
-      // fold the legs, sink into the pillow, and turn to face forward
-      var e = suave((t - tEstado) / T_ECHARSE), giro2 = lerp(1, 0.04, suave((t - tEstado) / (T_ECHARSE * 0.8)));
-      cabezaEn(postura(fase, 0, e, giro2));
-      manos.setAttribute("opacity", suave((e - 0.5) * 2));
-      manos.setAttribute("transform", "translate(0 " + (SUELO - 9 + 4 * (1 - e)) + ")");
-      // a small settle as the weight lands: the pillow gives, the body sinks and comes back up
-      var asiento = Math.sin(Math.PI * clamp((t - tEstado - T_ECHARSE * 0.75) / 0.55, 0, 1));
-      coloca(lerp(meta, almCx - CABEZA_X * u, e), arriba + 2.5 * asiento, 1);
-      if (!aplasto && e > 0.8) {
+      // sits first (hind end down), then walks the front paws out and lowers the chest, turning to
+      // face forward; the bed gives as the weight lands
+      var s = t - tEstado;
+      var eT = suave(s / 0.75), eD = suave((s - 0.6) / 1.0), giro2 = lerp(1, 0.04, suave((s - 0.7) / 1.0));
+      cabezaEn(postura(fase, 0, eT, eD, giro2, 1, 0));
+      manos.setAttribute("opacity", suave((eD - 0.5) * 2));
+      manos.setAttribute("transform", "translate(0 " + (SUELO - 9 + 4 * (1 - eD)) + ")");
+      var asiento = Math.sin(Math.PI * clamp((s - 1.35) / 0.55, 0, 1));
+      coloca(lerp(meta, almCx - CABEZA_X * u, eD), arriba + 2.5 * asiento, 1);
+      if (!aplasto && eD > 0.8) {
         aplasto = true;
         [fondo.div, frente.div].forEach(function (d) {
           d.style.transformOrigin = "50% 80%";
@@ -269,10 +308,14 @@
             { duration: 600, easing: "ease-out" });
         });
       }
-      if (e >= 1) {
-        // settled: slow breathing as a Web Animation, so no frame loop keeps running
-        caja.animate([{ transform: "scale(1,1)" }, { transform: "scale(1.012,1.03)" }, { transform: "scale(1,1)" }],
-          { duration: 3400, iterations: Infinity, easing: "ease-in-out" });
+      if (s >= T_ECHARSE) {
+        // settled: one deep sigh, then slow breathing, as Web Animations (no frame loop keeps running)
+        var suspiro = caja.animate([{ transform: "scale(1,1)" }, { transform: "scale(1.03,1.07)", offset: 0.4 },
+          { transform: "scale(1,0.99)", offset: 0.8 }, { transform: "scale(1,1)" }], { duration: 1800, easing: "ease-in-out" });
+        suspiro.onfinish = function () {
+          caja.animate([{ transform: "scale(1,1)" }, { transform: "scale(1.012,1.03)" }, { transform: "scale(1,1)" }],
+            { duration: 3400, iterations: Infinity, easing: "ease-in-out" });
+        };
         return;
       }
     }
@@ -286,7 +329,7 @@
     D.body.appendChild(frente.div);
     fondo.div.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: "both" });
     frente.div.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: "both" });
-    cabezaEn(postura(0, 0, 0, 1));
+    cabezaEn(postura(0, 0, 0, 0, 1, 0, 0));
     coloca(x, arriba, 1);
     setTimeout(function () { W.requestAnimationFrame(cuadro); }, 700);
   };
