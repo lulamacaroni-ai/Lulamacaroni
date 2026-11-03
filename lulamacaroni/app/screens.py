@@ -78,6 +78,7 @@ class Datos:
 
 PORTADA = Path(__file__).with_name("static") / "portada.png"
 PERRITO = Path(__file__).with_name("static") / "perrito.png"  # the puppy, cut out of its background
+PERRITO_JS = Path(__file__).with_name("static") / "perrito.js"  # its animation, loaded only when it plays
 
 
 def es_portada(path: str, params: dict[str, str]) -> bool:
