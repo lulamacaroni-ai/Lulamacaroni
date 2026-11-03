@@ -6,6 +6,7 @@ Kept apart from the HTTP server so tests can render every screen offline.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import alertas as al
 from . import catalogo as cat
@@ -75,9 +76,19 @@ class Datos:
         return sum(1 for a in self.approvals if a.estado == "pendiente")
 
 
+PORTADA = Path(__file__).with_name("static") / "portada.png"
+
+
+def es_portada(path: str, params: dict[str, str]) -> bool:
+    """The bare root is the welcome page; ``/?p=`` (old Inicio links) still opens Inicio."""
+    return path == "/" and "p" not in params
+
+
 def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str | None:
     """HTML for ``path``, or None if there is no such screen."""
-    if path == "/":
+    if es_portada(path, params):
+        return views.portada(PORTADA.is_file(), banner)
+    if path in ("/", "/inicio"):
         clave = params.get("p", "7")
         clave = clave if clave in m.PERIODOS else "7"
         res = m.resumen(d.pedidos_rows, d.campanas, d.fuentes, m.periodo(clave, d.now),

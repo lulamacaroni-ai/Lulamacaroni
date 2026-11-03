@@ -242,4 +242,4 @@ def test_screens_open_on_a_sheet_without_the_new_tabs(tmp_path, store):
     assert d.faltan_tabs == ["Publicidad", "Topes"]
     html = render("/publicidad", {}, d)
     assert "setup_workbook" in html and "cero real" not in html.split("Pedidos desde")[0]
-    assert render("/", {}, d) and render("/catalogo", {}, d)
+    assert render("/inicio", {}, d) and render("/catalogo", {}, d)

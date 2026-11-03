@@ -28,7 +28,8 @@ from ..approval.gate import decide
 from ..approval.store import JsonStore, SheetsStore, open_store
 from ..localbook import LocalWorkbook, open_workbook
 from ..workbook import Workbook
-from .screens import Datos, render
+from . import views
+from .screens import PORTADA, Datos, es_portada, render
 
 APPROVER = config.get("LULA_APPROVER", "Lorena")
 TEXT = "text/plain; charset=utf-8"
@@ -87,6 +88,19 @@ class Handler(BaseHTTPRequestHandler):
             return
         url = urlparse(self.path)
         params = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/portada.png":  # the welcome art, served as-is
+            if not PORTADA.is_file():
+                return self._send(404, "No encontrado", TEXT)
+            data = PORTADA.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        if es_portada(url.path, params):  # no workbook read: the welcome page opens at once
+            return self._send(200, views.portada(PORTADA.is_file(), self.banner))
         try:
             html = render(url.path, params, Datos(self.book, self.store), self.banner)
         except Exception as exc:  # show a readable error instead of a dropped connection
