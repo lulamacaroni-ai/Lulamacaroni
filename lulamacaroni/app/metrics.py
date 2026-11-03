@@ -454,6 +454,12 @@ class Producto:
     precio_min: float | None
     precio_max: float | None
     rutas: frozenset[str] = frozenset()   # who prints its variants; empty = not synced yet
+    # real content from the channel (empty until a sync brings it)
+    imagen: str = ""                       # cover image URL on the channel's CDN
+    imagenes: tuple[str, ...] = ()         # product gallery, cover first
+    descripcion: str = ""
+    etiquetas: str = ""
+    tipo: str = ""
 
     @property
     def avisos(self) -> list[str]:
@@ -462,6 +468,19 @@ class Producto:
             a.append(f"{self.sin_sku} de {self.variantes} variantes sin SKU: no se pueden "
                      "ligar a una obra ni a Prodigi")
         return a
+
+
+def _contenido(rows: list[dict]) -> dict:
+    """Product content from its listing rows (the same on every variant row)."""
+    first = rows[0]
+    galeria = tuple(u.strip() for u in str(first.get("imagenes_producto") or "").splitlines()
+                    if u.strip())
+    portada = galeria[0] if galeria else next(
+        (str(r["imagen_url"]) for r in rows if r.get("imagen_url")), "")
+    return {"imagen": portada, "imagenes": galeria or ((portada,) if portada else ()),
+            "descripcion": str(first.get("descripcion") or ""),
+            "etiquetas": str(first.get("etiquetas") or ""),
+            "tipo": str(first.get("tipo_producto") or "")}
 
 
 def agrupar_catalogo(listados: list[dict]) -> list[Producto]:
@@ -479,7 +498,8 @@ def agrupar_catalogo(listados: list[dict]) -> list[Producto]:
             first.get("linea", ""), first.get("estado", ""), first.get("url", ""), len(rows),
             sum(1 for r in rows if not r.get("sku")),
             min(precios) if precios else None, max(precios) if precios else None,
-            frozenset(r["ruta_pod"] for r in rows if r.get("ruta_pod"))))
+            frozenset(r["ruta_pod"] for r in rows if r.get("ruta_pod")),
+            **_contenido(rows)))
     orden = {"publicado": 0, "en-aprobacion": 1, "borrador": 2, "pausado": 3, "retirado": 4}
     out.sort(key=lambda p: (orden.get(p.estado, 9), p.titulo.lower()))
     return out

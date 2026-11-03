@@ -273,9 +273,13 @@ query Products($first: Int!, $after: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       id legacyResourceId title handle status onlineStoreUrl vendor productType updatedAt
+      description tags
+      featuredMedia { preview { image { url altText } } }
+      media(first: 6) { nodes { ... on MediaImage { image { url altText } } } }
       variants(first: 100) {
         nodes {
           id legacyResourceId sku title price inventoryQuantity
+          image { url altText }
           inventoryItem { inventoryLevels(first: 5) { nodes { location { id } } } }
         }
       }
@@ -298,6 +302,7 @@ query Orders($first: Int!, $after: String, $query: String) {
       lineItems(first: 50) {
         nodes {
           id sku quantity name
+          image { url }
           originalTotalSet { shopMoney { amount } }
           totalDiscountSet { shopMoney { amount } }
           taxLines { priceSet { shopMoney { amount } } }
@@ -428,10 +433,46 @@ def listing_route(variant: dict, location_routes: dict[str, str] | None) -> str:
     return "manual" if routes == {"manual"} else "desconocida"
 
 
+# A Sheets cell holds at most 50,000 characters; a longer description is cut and says so.
+MAX_DESCRIPCION = 45_000
+MAX_IMAGENES = 6
+
+
+def _image_url(node: dict | None) -> str:
+    return ((node or {}).get("url") or "").strip()
+
+
+def product_images(product: dict) -> list[str]:
+    """The product's own images (featured first), as Shopify CDN URLs, at most six."""
+    urls = [_image_url(((product.get("featuredMedia") or {}).get("preview") or {}).get("image"))]
+    urls += [_image_url(n.get("image")) for n in (product.get("media") or {}).get("nodes") or []]
+    return list(dict.fromkeys(u for u in urls if u))[:MAX_IMAGENES]
+
+
+def product_content(product: dict) -> dict:
+    """Product-level content shared by every variant row: description, tags, images.
+
+    Images are links to Shopify's CDN, never copies, and the app shows them whole.
+    """
+    desc = (product.get("description") or "").strip()
+    if len(desc) > MAX_DESCRIPCION:
+        desc = desc[:MAX_DESCRIPCION] + " … (recortada: ver el texto completo en Shopify)"
+    return {
+        "descripcion": desc,
+        "etiquetas": ", ".join(product.get("tags") or []),
+        "tipo_producto": product.get("productType") or "",
+        "imagenes_producto": "\n".join(product_images(product)),
+    }
+
+
 def product_to_listing_rows(product: dict, now: str,
                             location_routes: dict[str, str] | None = None) -> list[dict]:
     rows = []
+    contenido = product_content(product)
+    portada = product_images(product)
     for v in product["variants"]["nodes"]:
+        # the variant's own mockup (frame, size) when it has one, else the product's cover
+        imagen = _image_url(v.get("image")) or (portada[0] if portada else "")
         rows.append({
             "listado_ref": f"shopify-{v['legacyResourceId']}",
             "sku": v.get("sku") or "",
@@ -446,6 +487,8 @@ def product_to_listing_rows(product: dict, now: str,
             "estado": LISTING_STATUS.get(product["status"], "borrador"),
             "ultima_sync": now,
             "id_producto_canal": product["legacyResourceId"],
+            "imagen_url": imagen,
+            **contenido,
             **({"ruta_pod": listing_route(v, location_routes)} if location_routes is not None
                else {}),
         })
@@ -577,6 +620,7 @@ def order_to_rows(order: dict, location_routes: dict[str, str] | None = None) ->
             "tracking": ", ".join(dict.fromkeys(tracking_by_line.get(li["id"], []))),
             "estado": estado,
             "producto": li.get("name") or "",
+            "imagen_url": _image_url(li.get("image")),
             "numero_canal": order.get("name") or "",
             "cliente_id": cliente_id,
             **origin,
