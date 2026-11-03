@@ -169,3 +169,29 @@ def test_root_is_the_welcome_page_with_a_way_in(book, store):
     # the art is never cropped or stretched, and the page still works without it
     assert "object-fit:contain" in views.PORTADA_CSS and "width:auto;height:auto" in views.PORTADA_CSS
     assert "<img" in views.portada(True) and "<img" not in views.portada(False)
+
+
+def test_puppy_plays_now_and_then_on_screens_but_not_on_the_welcome_page(book, store):
+    from lulamacaroni.app import views
+
+    d = Datos(book, store)
+    inicio = render("/inicio", {}, d)
+    assert "/perrito.png" in inicio and "lula-perrito" in inicio
+    assert "prefers-reduced-motion" in inicio  # no motion for people who turn it off
+    assert "perrito=1" in inicio  # a way to see it on demand
+    assert "/perrito.png" not in views.portada(True)  # never on the welcome page
+    assert "pointer-events:none" in views.CSS  # it never blocks a click
+    assert 0 < views.PERRITO_PROBABILIDAD < 1 and views.PERRITO_CADA_MIN >= 5
+
+
+def test_puppy_art_is_cut_out_but_never_stretched():
+    from PIL import Image
+
+    from lulamacaroni.app import views
+    from lulamacaroni.app.screens import PERRITO
+
+    im = Image.open(PERRITO)
+    assert im.mode == "RGBA"  # background removed
+    # same proportions as the trimmed artwork (1246×1136): resized evenly, never stretched
+    assert abs(im.width / im.height - 1246 / 1136) < 0.01
+    assert "1136/1246" in views.PERRITO_JS  # drawn at the same proportions
