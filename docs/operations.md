@@ -8,7 +8,7 @@ Status: 2026-11-02.
 
 Everything runs in the Claude project's cloud environment **"LulaMacaroni"** (the project default). There is no local install and no server yet. A session runs the connectors and the app on demand. The app binds to `127.0.0.1:8770`, and Claude takes screenshots of it.
 
-Next step for hosting: Cloudflare Pages + Access under the business Google account, so Lorena opens the app and approvals from her phone behind a login. It must never be exposed without Access.
+To run it on Jon's Windows PC: [run-local.md](run-local.md) (`run.bat`, `sync.bat`). To host it for Lorena behind a password: [hosting.md](hosting.md) (Render, `render.yaml`). The server refuses to listen beyond 127.0.0.1 unless `LULA_APP_PASSWORD` is set.
 
 **Environment and network changes reach new sessions only.** After editing the environment, start a new thread before testing.
 
