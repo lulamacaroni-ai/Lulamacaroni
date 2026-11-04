@@ -42,7 +42,10 @@ FUENTES = (
     FuenteInfo("quickbooks", "QuickBooks", "API", 48, "aún no existe la cuenta de QuickBooks"),
     FuenteInfo("meta", "Meta Ads", "API", 26, "requiere revisión de app de Meta"),
     FuenteInfo("instagram", "Instagram", "API", 26, "requiere revisión de app de Meta"),
-    FuenteInfo("pinterest", "Pinterest + Ads", "API", 26, "requiere aprobación de Pinterest"),
+    FuenteInfo("pinterest", "Pinterest", "API", 26,
+               "falta el permiso PINTEREST_ACCESS_TOKEN (docs/setup/pinterest.md)"),
+    FuenteInfo("pinterest-ads", "Pinterest Ads", "API", 26,
+               "se lee con Pinterest, si la cuenta tiene cuenta de anuncios"),
     FuenteInfo("erank", "eRank", "CSV mensual", 24 * 35, "importación mensual"),
     FuenteInfo("everbee", "EverBee", "CSV mensual", 24 * 35, "importación mensual"),
     FuenteInfo("gmail", "Correo info@", "Gmail", 26, "fase 4 (bandeja de clientes)"),
@@ -260,7 +263,7 @@ def resumen(pedidos: list[dict], campanas: list[dict], fuentes: dict[str, Estado
             enlace="/pedidos"))
 
     # Ad spend: Campanas only fills once Meta / Pinterest are connected.
-    ads = [f for f in (fuentes["meta"], fuentes["pinterest"]) if f.conectada]
+    ads = [f for f in (fuentes["meta"], fuentes["pinterest-ads"]) if f.conectada]
     if not ads:
         datos.append(faltante("Gasto publicitario", "Meta Ads + Pinterest Ads", per.texto,
                               "Gasto reportado por cada plataforma de anuncios en el periodo.",

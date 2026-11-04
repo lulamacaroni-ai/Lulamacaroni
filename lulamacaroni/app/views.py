@@ -901,8 +901,69 @@ def _pieza(p, now: datetime, con_fecha: bool = True) -> str:
             f'<span class="badge {cls}">{corto}</span></div></div>')
 
 
+PRIVACIDAD = {"publico": "Público", "protegido": "Protegido", "secreto": "Secreto"}
+
+
+def _celda_pin(p: dict, col: str) -> str:
+    v = p.get(col)
+    if v in (None, ""):
+        return '<span class="meta">—</span>'
+    try:
+        return f"{float(v):,.0f}"
+    except (TypeError, ValueError):
+        return '<span class="meta">—</span>'
+
+
+def pinterest_seccion(vp, now: datetime) -> str:
+    """Pinterest's own numbers: account totals, the most seen pins and the boards."""
+    out = ["<h2>Pinterest: resultados</h2>"]
+    if not vp.conectada:
+        out.append(f'<div class="card info"><div class="m">{escape(vp.nota)} Los números de '
+                   "Pinterest salen como “—” (no cero) hasta conectarlo.</div></div>")
+        return "".join(out)
+    out.append(f'<p class="sub">Leído de la API de Pinterest, solo lectura: aquí nunca se '
+               f"publica ni se cambia nada en Pinterest. {escape(vp.nota)}</p>")
+    if vp.faltan_tabs:
+        out.append(f'<div class="card info"><div class="m">La hoja aún no tiene la(s) '
+                   f'pestaña(s) {escape(", ".join(vp.faltan_tabs))}. Se crean con '
+                   "setup_workbook; mientras tanto esos números salen como “—”.</div></div>")
+    out.append(f'<div class="grid">{"".join(_kpi(d, now) for d in vp.datos)}</div>')
+    if vp.pines:
+        filas = []
+        for p in vp.pines[:15]:
+            titulo = p.get("titulo") or p.get("producto") or f"Pin {p.get('pin_id')}"
+            enlace = (f'<a href="https://www.pinterest.com/pin/{escape(p.get("pin_id"))}/" '
+                      f'rel="noopener">{escape(titulo)}</a>')
+            prod = escape(p.get("producto") or "—")
+            q = p.get("calidad_dato") or "faltante"
+            filas.append(
+                f"<tr><td>{imagen(p.get('imagen_url') or '', titulo, 'sm', 120)}</td>"
+                f"<td>{enlace}<br><span class='meta'>{escape(p.get('tablero') or '')}</span></td>"
+                f"<td>{prod}</td>"
+                + "".join(f"<td>{_celda_pin(p, c)}</td>" for c in
+                          ("impresiones", "guardados", "clics_enlace"))
+                + f"<td><span class='meta'>{escape(q)}</span></td></tr>")
+        periodo = escape(vp.pines[0].get("periodo") or "últimos 30 días")
+        out.append(
+            f"<h2>Pines más vistos ({len(vp.pines)})</h2>"
+            f'<p class="meta">Periodo: {periodo}. Fuente: Pinterest (analítica por pin). '
+            "“—” = Pinterest no dio el dato; no es cero.</p>"
+            "<div class='tablebox'><table><thead><tr><th></th><th>Pin</th><th>Producto</th>"
+            "<th>Impresiones</th><th>Guardados</th><th>Clics al enlace</th><th>Dato</th>"
+            f"</tr></thead><tbody>{''.join(filas)}</tbody></table></div>")
+    if vp.tableros:
+        filas = "".join(
+            f"<tr><td>{escape(t.get('nombre'))}</td><td>{escape(PRIVACIDAD.get(t.get('privacidad') or '', '—'))}</td>"
+            f"<td>{_celda_pin(t, 'pines')}</td><td>{_celda_pin(t, 'seguidores')}</td></tr>"
+            for t in vp.tableros)
+        out.append(f"<h2>Tableros ({len(vp.tableros)})</h2><div class='tablebox'><table>"
+                   "<thead><tr><th>Tablero</th><th>Privacidad</th><th>Pines</th>"
+                   f"<th>Seguidores</th></tr></thead><tbody>{filas}</tbody></table></div>")
+    return "".join(out)
+
+
 def contenido_view(ps: list, datos: list[Dato], plataforma: str, now: datetime,
-                   banner: str = "") -> str:
+                   banner: str = "", pinterest=None) -> str:
     from .contenido import ESTADO, calendario
 
     chips = "".join(
@@ -933,9 +994,11 @@ def contenido_view(ps: list, datos: list[Dato], plataforma: str, now: datetime,
             continue
         body.append(f'<h2 class="{"warn" if estado == "fallido" else ""}">{titulo} ({len(items)})</h2>')
         body.append("".join(_pieza(p, now) for p in items))
+    if pinterest is not None:
+        body.append(pinterest_seccion(pinterest, now))
     body.append('<p class="legend">Los textos para EUA van en inglés. Las imágenes son los '
                 "archivos originales aprobados: nunca se recortan, estiran ni regeneran. "
-                "Resultados “—” hasta conectar Instagram y Pinterest.</p>")
+                "Resultados de Instagram “—” hasta conectarlo.</p>")
     return page("Contenido", "/contenido", "".join(body), banner)
 
 

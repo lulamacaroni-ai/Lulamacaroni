@@ -364,7 +364,7 @@ def atribucion_plataformas(campanas: list[dict], fuentes: dict[str, m.EstadoFuen
                            per: m.Periodo) -> list[m.Dato]:
     """What each ad platform claims, one Dato each. Never added together."""
     out = []
-    for clave, plat, nombre in (("meta", "meta", "Meta Ads"), ("pinterest", "pinterest",
+    for clave, plat, nombre in (("meta", "meta", "Meta Ads"), ("pinterest-ads", "pinterest",
                                                                "Pinterest Ads"),
                                 ("etsy", "etsy-ads", "Etsy Ads")):
         f = fuentes[clave]
