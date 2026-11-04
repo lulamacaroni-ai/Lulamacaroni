@@ -116,7 +116,15 @@ El calendario de 14 días y la fila de piezas para Instagram y Pinterest: ideas,
 
 Cada pieza muestra si su aprobación es válida. La aprobación cubre exactamente la plataforma, el formato, el idioma, el texto, la imagen y la fecha. Si cambias cualquiera de esas cosas, la pieza pide aprobación otra vez.
 
-Instagram y Pinterest todavía no están conectados, así que nada se publica solo y los resultados de cada post salen como “—”.
+Abajo está **Pinterest: resultados**, leído directo de tu cuenta de Pinterest (solo lectura; desde aquí nunca se publica ni se cambia nada en Pinterest):
+
+- Impresiones, guardados, clics al enlace y clics en el pin de los últimos 30 días con datos. Pinterest reporta con 1 o 2 días de retraso; mientras aún procesa algún día, el número sale como “estimado”.
+- Tus pines más vistos, con el producto de la tienda al que lleva cada uno.
+- Tus tableros, con cuántos pines y seguidores tiene cada uno.
+
+El permiso de lectura de Pinterest dura como un mes. Una semana antes de que venza, Alertas te avisa; pídele a Jon uno nuevo. Si vence, los números de Pinterest salen “atrasados”, nunca en cero.
+
+Instagram todavía no está conectado: nada se publica solo y los resultados de sus posts salen como “—”.
 
 ### Anuncios (Publicidad)
 
@@ -125,7 +133,7 @@ Tus campañas planeadas, tus topes de gasto y de dónde llegan las ventas.
 - **Campañas**: cada una es una fila en la pestaña Publicidad de tu hoja (plataforma, texto, imagen, destino, público, presupuesto, fechas). Ninguna se lanza sin tu aprobación, y **cada cambio de presupuesto también necesita aprobación**.
 - **Topes**: en la pestaña Topes pones cuánto se puede gastar al día, al mes, por plataforma, y qué tan grande puede ser un cambio de presupuesto. Si una campaña pasa un tope, aparece una alerta.
 - **De dónde llegan las ventas**: lo que Shopify sabe de cada pedido (etiquetas UTM y el sitio de donde vino la visita). Cuando no es seguro, lo dice.
-- **Resultados de Meta, Pinterest o Google**: “fuente no conectada”. Ninguna plataforma de anuncios está conectada todavía, y el sistema nunca manda nada a ellas.
+- **Resultados de Meta, Pinterest o Google**: Pinterest Ads se lee junto con Pinterest, pero solo si tu cuenta de Pinterest tiene cuenta de anuncios; si no, dice “fuente no conectada”, igual que Meta y Google. El sistema nunca manda nada a ninguna plataforma de anuncios.
 
 ### Pedidos
 
@@ -220,8 +228,8 @@ Hoy dicen “fuente no conectada”:
 
 - **Etsy**: aún no tienes cuenta de vendedora en Etsy.
 - **Contabilidad (QuickBooks)**: falta crear la cuenta.
-- **Meta, Pinterest y Google Ads**: no hay ninguna plataforma de anuncios conectada.
-- **Instagram y Pinterest (publicaciones)**: no se publican solas todavía.
+- **Meta, Google Ads y Pinterest Ads** (Pinterest Ads solo si no hay cuenta de anuncios): no hay ninguna plataforma de anuncios conectada.
+- **Instagram**: no está conectado. Pinterest sí se lee (solo lectura); nada se publica solo en ninguna de las dos.
 
 Cuando se conecte una, su estado en Fuentes cambia a “al día” y sus números empiezan a aparecer.
 
@@ -272,6 +280,7 @@ Cambia la contraseña de cada cuenta del negocio: Google (lulamacaroni@gmail.com
 | Shopify | Shopify Dev Dashboard → app “LulaMacaroni Operaciones” → Settings → rotar el client secret | `SHOPIFY_CLIENT_SECRET` |
 | Prodigi (real) | Panel de Prodigi → Settings → Integrations → API → generar llave nueva | `PRODIGI_API_KEY` |
 | Prodigi (pruebas) | Panel de pruebas de Prodigi → mismo lugar | `PRODIGI_SANDBOX_API_KEY` |
+| Pinterest | Se hace un permiso nuevo con los pasos de `docs/setup/pinterest.md` (sección 2); para cortar el acceso: Pinterest → Configuración → Seguridad → Apps conectadas → quitar “LulaMacaroni Oficina” | `PINTEREST_ACCESS_TOKEN`, `PINTEREST_TOKEN_VENCE` |
 | Google | Google Cloud (lulamacaroni@gmail.com) → proyecto “LulaMacaroni Operaciones” → IAM y administración → Cuentas de servicio → backoffice → Claves → Agregar clave → JSON. Después borra la clave vieja | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` |
 
 Para la llave de Google, el archivo JSON se convierte en una sola línea. En Windows, en PowerShell:
@@ -284,7 +293,7 @@ Pega el resultado después de `GOOGLE_SERVICE_ACCOUNT_JSON_B64=` y **borra el ar
 
 Después de cambiar las llaves, abre un hilo nuevo y pídele a Claude *“revisa todas las conexiones”*. Si todo responde, borra las llaves viejas donde todavía existan.
 
-Cuando se conecten Etsy, QuickBooks, Meta o Pinterest, sus llaves se agregan a esta tabla.
+Cuando se conecten Etsy, QuickBooks o Meta, sus llaves se agregan a esta tabla.
 
 ## 9. A quién le preguntas
 

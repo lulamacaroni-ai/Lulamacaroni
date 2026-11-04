@@ -133,7 +133,8 @@ def test_content_screen(book, store, tmp_path):
     d = Datos(book, store, NOW)
     html = render("/contenido", {}, d)
     assert "Próximos 14 días" in html and "Garden reveal reel" in html
-    assert "Ideas (1)" in html and "Instagram y Pinterest aún no están conectados" in html
+    assert "Ideas (1)" in html and "Instagram aún no está conectado" in html
+    assert "Pinterest: resultados" in html and "Pines más vistos (3)" in html
     pin = render("/contenido", {"pl": "pinterest"}, d)
     assert "Garden print pin" in pin and "Garden reveal reel" not in pin
     empty = render("/contenido", {}, Datos(LocalWorkbook(tmp_path / "vacio"), store, NOW))
@@ -149,4 +150,4 @@ def test_content_screen_escapes_text(tmp_path, store):
 
 def test_resultados_missing_until_platforms_connect():
     datos = cont.resumen([], m.estado_fuentes([], NOW), NOW)
-    assert next(x for x in datos if x.etiqueta == "Resultados").calidad == "faltante"
+    assert next(x for x in datos if x.etiqueta == "Resultados de Instagram").calidad == "faltante"

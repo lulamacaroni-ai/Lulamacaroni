@@ -1,6 +1,7 @@
 """Run every connected sync in one go, then print today's alerts.
 
-    python -m lulamacaroni.sync            # Shopify (orders, listings, payouts, customers), then Prodigi costs
+    python -m lulamacaroni.sync            # Shopify (orders, listings, payouts, customers), then Prodigi
+                                           # costs, then Pinterest (when PINTEREST_ACCESS_TOKEN is set)
 
 This is the one command a daily routine runs. Each source is independent: if one fails,
 the others still run, and the failed one is marked ``error`` in the Fuentes tab so the app
@@ -8,7 +9,7 @@ raises "la última sincronización falló" instead of quietly showing old number
 The error note keeps only the error type, never the message (it can echo a response body).
 The last good update time is kept, so the app never shows failed data as fresh.
 
-Reads Shopify and Prodigi only; writes only the workbook. Etsy and QuickBooks have no
+Reads Shopify, Prodigi and Pinterest only; writes only the workbook. Etsy and QuickBooks have no
 account yet and stay "fuente no conectada".
 """
 
@@ -33,6 +34,12 @@ def _prodigi() -> None:
     prodigi.main(["--sync"])
 
 
+def _pinterest() -> None:
+    from .connectors import pinterest
+
+    pinterest.main([])
+
+
 def _prodigi_fuente() -> str:
     # same key the connector stamps: a sandbox run must never look like live data
     return "prodigi" if config.get("PRODIGI_ENV", "sandbox") == "live" else "prodigi-sandbox"
@@ -42,6 +49,15 @@ STEPS: list[tuple[str, Callable[[], str], Callable[[], None]]] = [
     ("Shopify", lambda: "shopify", _shopify),
     ("Prodigi", _prodigi_fuente, _prodigi),
 ]
+
+
+def pasos() -> list:
+    """The steps to run. Pinterest joins only once its token is set: a source that was never
+    connected stays "sin conectar", not "error"."""
+    out = list(STEPS)
+    if config.get("PINTEREST_ACCESS_TOKEN"):
+        out.append(("Pinterest", lambda: "pinterest", _pinterest))
+    return out
 
 
 def mark_error(wb, fuente: str, exc: BaseException) -> None:
@@ -63,7 +79,7 @@ def run(wb=None, steps=None, out=sys.stdout) -> int:
 
     wb = wb if wb is not None else open_workbook()
     fallas = 0
-    for nombre, fuente, step in steps if steps is not None else STEPS:
+    for nombre, fuente, step in steps if steps is not None else pasos():
         print(f"== {nombre}", file=out, flush=True)
         try:
             step()

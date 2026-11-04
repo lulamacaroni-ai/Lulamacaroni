@@ -80,6 +80,8 @@ ESTADOS_SEGUIMIENTO = ("pendiente", "hecho", "cancelado")
 
 ORIENTACIONES = ("vertical", "horizontal", "cuadrada")
 
+PRIVACIDAD_TABLERO = ("publico", "protegido", "secreto")
+
 # Market research (Lorena's requirements, sections 7 and 8): monthly CSV exports from eRank
 # and EverBee. Every number in them is the tool's own estimate on the day of the export;
 # none is a promise of sales.
@@ -367,6 +369,39 @@ TABS: tuple[Tab, ...] = (
         ),
         validaciones={"linea": LINEAS, "canal": CANALES, "categoria": CATEGORIAS_PRODUCTO,
                       "estado": ESTADOS_KEYWORD},
+    ),
+    # Pinterest (read-only sync, connectors/pinterest.py). Pins and boards are Lorena's own;
+    # nothing about other people (comments, followers, audiences) is stored.
+    Tab(
+        nombre="Tableros",
+        fila="Un tablero de Pinterest de la cuenta del negocio",
+        clave="tablero_id",
+        columnas=("tablero_id", "nombre", "descripcion", "privacidad", "pines", "seguidores",
+                  "creado", "ultima_sync"),
+        validaciones={"privacidad": PRIVACIDAD_TABLERO},
+    ),
+    Tab(
+        nombre="Pines",
+        fila="Un pin de la cuenta, con sus números de los últimos 30 días según Pinterest",
+        clave="pin_id",
+        columnas=(
+            "pin_id", "linea", "tablero_id", "tablero", "titulo", "descripcion", "enlace",
+            # the Shopify product the pin links to (matched by /products/<handle>)
+            "id_producto_canal", "producto",
+            # the pin's image on Pinterest's CDN (a link, never a copy)
+            "imagen_url", "tipo_medio", "creado",
+            "periodo", "impresiones", "guardados", "clics_pin", "clics_enlace",
+            "calidad_dato", "ultima_sync",
+        ),
+        validaciones={"linea": LINEAS, "calidad_dato": CALIDAD_DATO},
+    ),
+    Tab(
+        nombre="PinterestDiario",
+        fila="Un día de la cuenta de Pinterest: impresiones, guardados y clics de todos los pines",
+        clave="fecha",
+        columnas=("fecha", "linea", "impresiones", "guardados", "clics_pin", "clics_enlace",
+                  "interacciones", "estado_pinterest", "calidad_dato", "ultima_sync"),
+        validaciones={"linea": LINEAS, "calidad_dato": CALIDAD_DATO},
     ),
     Tab(
         nombre="Fuentes",
