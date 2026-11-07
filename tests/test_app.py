@@ -218,7 +218,8 @@ def test_puppy_art_is_cut_out_but_never_stretched():
     for clave in ("main h1", "PASO", "VUELTAS", "echarse", "iterations: Infinity",
                   "DEL = {", "TRAS = {",  # three-bone legs: wrist and hock, not just a knee
                   "pf-sombra", "pf-vol", "lejos",  # depth: ground shadow, shading, far legs set back
-                  "ANG_DEL", "ANG_TRAS", "olfatea", "suspiro"):  # gait curves, sniff, sit-then-lie, sigh
+                  "ANG_DEL", "ANG_TRAS", "olfatea", "suspiro",  # gait curves, sniff, sit-then-lie, sigh
+                  "asoma", "overflow:hidden"):  # peeks in from the right edge without side-scrolling
         assert clave in js
     assert "inicio)?$" in views.PERRITO_JS  # only on Inicio, next to "Hola, Lore"
 
