@@ -22,6 +22,10 @@ The store on lulamacaroni.com replaces the Shopify storefront. It lives in `lula
 
 Prints always use `sizing: fitPrintArea`: Prodigi never crops or stretches the file. The print file must already have the right proportion (the resolution check reports it).
 
+## Later: automatic approval of routine orders
+
+For now Lore taps every order (JIM, 2026-11-26). The plan for automating it is still an approval: Lore approves one standing rule, for example "send to Prodigi any order whose items all have a checked print file, whose total is under US$300, and whose address matches Stripe", with an expiry date. An order that fits the rule is sent and recorded against it, and anything outside the rule still waits for her tap. There is no bypass flag; switching the rule off is one tap in Aprobar.
+
 ## Putting products on sale
 
 ```bash
