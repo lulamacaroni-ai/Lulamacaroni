@@ -67,7 +67,7 @@ One row per: Un SKU publicado en un canal. Key: `listado_ref`.
 | `listado_ref` |  |
 | `sku` |  |
 | `linea` | US-POD, MX-original |
-| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `id_en_canal` |  |
 | `titulo_en_canal` |  |
 | `url` |  |
@@ -93,7 +93,7 @@ One row per: Una línea de pedido. Key: `linea_pedido_id`.
 | `linea_pedido_id` |  |
 | `pedido_id` |  |
 | `linea` | US-POD, MX-original |
-| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `fecha` |  |
 | `sku` |  |
 | `cantidad` |  |
@@ -132,7 +132,7 @@ One row per: Un depósito o payout recibido (kept apart from the gross sale). Ke
 |---|---|
 | `pago_id` |  |
 | `linea` | US-POD, MX-original |
-| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `fecha` |  |
 | `moneda` |  |
 | `monto_depositado` |  |
@@ -171,7 +171,7 @@ One row per: Un cliente o contacto (only what the channel shares and consent all
 |---|---|
 | `cliente_id` |  |
 | `linea` | US-POD, MX-original |
-| `canal_origen` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal_origen` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `nombre` |  |
 | `pais` |  |
 | `consentimiento_email` | si, no, desconocido |
@@ -247,7 +247,7 @@ One row per: Una campaña planeada: creativo, destino, presupuesto y su aprobaci
 | `obra_id` |  |
 | `objetivo` |  |
 | `audiencia` |  |
-| `destino` | shopify, etsy, sitio-mx, instagram, otro |
+| `destino` | shopify, web, etsy, sitio-mx, instagram, otro |
 | `url_destino` |  |
 | `utm_campana` |  |
 | `texto` |  |
@@ -283,7 +283,7 @@ One row per: Un mensaje o interesado (Mexico site inquiries land here). Key: `co
 |---|---|
 | `consulta_id` |  |
 | `linea` | US-POD, MX-original |
-| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `fecha` |  |
 | `tipo` | producto, tamano, compra, envio, pedido, dano, devolucion, colaboracion, spam, otro |
 | `obra_id` |  |
@@ -298,7 +298,7 @@ One row per: Una solicitud de aprobación y la decisión de Lorena. Key: `aproba
 | Column | Allowed values |
 |---|---|
 | `aprobacion_id` |  |
-| `tipo` | listado, contenido, anuncio, presupuesto, reembolso, cancelacion, pedido-manual, respuesta-cliente, precio |
+| `tipo` | listado, contenido, anuncio, presupuesto, reembolso, cancelacion, pedido-manual, pedido-tienda, respuesta-cliente, precio |
 | `linea` | US-POD, MX-original |
 | `resumen` |  |
 | `detalle` |  |
@@ -416,7 +416,7 @@ One row per: Una keyword que Lorena quiere probar en una obra, y cómo le fue. K
 | `keyword_id` |  |
 | `obra_id` |  |
 | `linea` | US-POD, MX-original |
-| `canal` | shopify, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
+| `canal` | shopify, web, etsy, sitio-mx, whatsapp, instagram, pinterest, otro |
 | `keyword` |  |
 | `categoria` | print, enmarcado, descargable, cojin, wallpaper, otro |
 | `estado` | a-probar, probando, en-uso, descartada |

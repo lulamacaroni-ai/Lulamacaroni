@@ -28,7 +28,8 @@ LINEAS_GASTOS = LINEAS + ("compartido",)
 
 ESTADOS_PAGO = ("programado", "en-transito", "pagado", "fallido", "cancelado")
 
-CANALES = ("shopify", "etsy", "sitio-mx", "whatsapp", "instagram", "pinterest", "otro")
+# "web" is our own store on lulamacaroni.com (lulamacaroni/tienda), replacing Shopify
+CANALES = ("shopify", "web", "etsy", "sitio-mx", "whatsapp", "instagram", "pinterest", "otro")
 
 TIPOS_VARIANTE = ("original", "impresion", "enmarcado", "descargable")
 
@@ -51,6 +52,7 @@ TIPOS_APROBACION = (
     "reembolso",          # refund
     "cancelacion",        # cancel an order
     "pedido-manual",      # manual POD order or reprint
+    "pedido-tienda",      # send a paid order from our own store (canal web) to Prodigi
     "respuesta-cliente",  # customer reply outside approved templates
     "precio",             # price change
 )
@@ -71,7 +73,7 @@ CALIDAD_DATO = ("real", "estimado", "faltante")
 PLATAFORMAS_ANUNCIOS = ("meta", "pinterest", "google", "etsy-ads", "otro")
 ESTADOS_CAMPANA = ("idea", "borrador", "por-aprobar", "aprobada", "activa", "pausada",
                    "terminada", "rechazada")
-DESTINOS_ANUNCIO = ("shopify", "etsy", "sitio-mx", "instagram", "otro")
+DESTINOS_ANUNCIO = ("shopify", "web", "etsy", "sitio-mx", "instagram", "otro")
 # What Shopify's customer journey says about the visit that led to an order
 ESTADOS_ORIGEN = ("ok", "sin-recorrido", "pendiente", "sin-permiso")
 

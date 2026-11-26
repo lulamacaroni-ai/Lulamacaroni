@@ -14,6 +14,7 @@ TIPO_LABEL = {
     "reembolso": "Reembolso",
     "cancelacion": "Cancelación",
     "pedido-manual": "Pedido manual",
+    "pedido-tienda": "Pedido de la tienda",
     "respuesta-cliente": "Respuesta a cliente",
     "precio": "Cambio de precio",
 }

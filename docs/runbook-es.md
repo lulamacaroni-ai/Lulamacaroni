@@ -212,6 +212,16 @@ Una obra aparece en el sitio cuando:
 
 Para publicar, pídele a Claude *“prepara el sitio de México”*. Te llega a **Aprobar** una tarjeta con todas las obras, precios, fotos, datos de contacto y el aviso de privacidad. Solo se publica lo que aprobaste: si algo cambió después, te pide aprobar otra vez. Cuando vendas una obra, márcala `vendida` en Obras y el sistema te avisa para retirarla del sitio.
 
+## 5c. Tu tienda propia (lulamacaroni.com)
+
+La tienda en inglés para compradores de EUA ya no depende de Shopify: vive en tu mismo servidor, y este back office es su administración (pantalla **Tienda web**).
+
+- **Cuando alguien compra:** te llega a **Aprobar** una tarjeta “Pedido de la tienda” con las obras, el tamaño, el marco, lo cobrado y el estado de destino. Tócala y en unos minutos el pedido se manda a Prodigi. Si la rechazas, no se imprime nada y hay que devolverle el dinero desde Stripe.
+- **El comprador recibe dos correos**: la confirmación al pagar y el aviso con la guía cuando Prodigi lo envía.
+- **Los datos del comprador** (correo, dirección) se quedan en Stripe. En tu hoja solo ves su nombre corto, su estado y su país.
+- **Poner obras a la venta o cambiar precios** también pasa por Aprobar: una tarjeta “Listado” con todo el catálogo. Si cambias algo después de aprobar, hace falta aprobar otra vez.
+- **Si un pedido sale “Con un problema”** en Tienda web, casi siempre falta el archivo de impresión en tamaño completo de esa obra. Mándaselo a Jon y el pedido sigue.
+
 ## 6. “Fuente no conectada”
 
 Quiere decir que esa cuenta todavía no existe o aún no está ligada al sistema. **No es un error y no es cero.** Sus números se muestran como “—”.
