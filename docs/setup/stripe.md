@@ -31,7 +31,7 @@ Everything is done in Lore's business account, with **lulamacaroni@gmail.com**. 
 
 1. Still in test mode: **Developers** then **Webhooks** then **Add endpoint**.
 2. Endpoint URL: `https://lulamacaroni.com/stripe/webhook` (before the domain moves, use the test address Claude gives you).
-3. **Select events:** `checkout.session.completed`. Click **Add endpoint**.
+3. **Select events:** `checkout.session.completed` and `checkout.session.async_payment_succeeded` (bank payments that clear later). Click **Add endpoint**.
 4. On the endpoint's page, under **Signing secret**, click **Reveal** and copy it (it starts with `whsec_`). It goes in Render as `STRIPE_WEBHOOK_SECRET`.
 
 ## 5. Put the keys in Render

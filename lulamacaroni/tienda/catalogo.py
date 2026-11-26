@@ -10,6 +10,7 @@ Prices always come from here, never from the buyer's browser.
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import time
@@ -20,6 +21,8 @@ CANAL = "web"
 TIPO = "Framed print"
 PROVEEDOR = "prodigi"
 CACHE_SEGUNDOS = 300
+REINTENTO_SEGUNDOS = 60  # after a failed Sheet read
+log = logging.getLogger(__name__)
 
 
 def slug(texto: str) -> str:
@@ -142,8 +145,15 @@ class Catalogo:
     def productos(self) -> list[Producto]:
         with self._lock:
             if self._cuando is None or self.clock() - self._cuando > self.ttl:
-                self._productos = construir(self.book.read("Listados"), self.book.read("Variantes"))
-                self._cuando = self.clock()
+                try:
+                    self._productos = construir(self.book.read("Listados"),
+                                                self.book.read("Variantes"))
+                    self._cuando = self.clock()
+                except Exception:  # noqa: BLE001 - Sheet outage: keep the last good catalog
+                    if self._cuando is None:
+                        raise
+                    log.warning("catalog reload failed; serving the last good copy")
+                    self._cuando = self.clock() - self.ttl + REINTENTO_SEGUNDOS
             return self._productos
 
     def refrescar(self) -> None:

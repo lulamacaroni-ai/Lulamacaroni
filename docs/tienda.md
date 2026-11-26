@@ -11,7 +11,7 @@ The store on lulamacaroni.com replaces the Shopify storefront. It lives in `lula
 
 1. The buyer picks a size and frame and adds it to the cart. The cart is a signed cookie that holds SKUs and quantities only.
 2. **Check out securely** creates a Stripe Checkout Session with prices taken from the workbook (never from the browser), US-only shipping, and Stripe Tax. The buyer pays on Stripe's page; card data never reaches us.
-3. Stripe calls `POST /stripe/webhook` (`checkout.session.completed`). The signature is checked, then the session is read back from Stripe and recorded:
+3. Stripe calls `POST /stripe/webhook` (`checkout.session.completed`, or `checkout.session.async_payment_succeeded` for payments that clear later). The signature is checked, then the session is read back from Stripe and recorded:
    - `Pedidos`: one row per line, `canal = web`, number `LM-1001` onwards, `calidad_dato = estimado` until the real Stripe fee and Prodigi cost arrive.
    - `Clientes`: `stripe-<customer id>`, first name + last initial, state, country. **Email, phone and street address stay in Stripe.**
    - `Aprobaciones`: a `pedido-tienda` request with exactly what Prodigi will receive, except the street address, which is stored as a SHA-256 fingerprint.
@@ -25,6 +25,17 @@ Prints always use `sizing: fitPrintArea`: Prodigi never crops or stretches the f
 ## Later: automatic approval of routine orders
 
 For now Lore taps every order (JIM, 2026-11-26). The plan for automating it is still an approval: Lore approves one standing rule, for example "send to Prodigi any order whose items all have a checked print file, whose total is under US$300, and whose address matches Stripe", with an expiry date. An order that fits the rule is sent and recorded against it, and anything outside the rule still waits for her tap. There is no bypass flag; switching the rule off is one tap in Aprobar.
+
+## Safety nets
+
+- One order at a time: webhooks and the Prodigi worker share a lock, so Stripe retries or two events at once never make two LM numbers or two approvals.
+- Prodigi gets the approval id as `idempotencyKey`: sending the same approved order twice returns the same Prodigi order (checked against the Prodigi sandbox on 2026-11-26, order format accepted: `GLOBAL-BOX-8X8`, `fitPrintArea`, color black).
+- If Prodigi refuses one order, it goes to Excepciones and the others still go out.
+- If the confirmation email fails, the order is still recorded and an Excepciones row says to resend it.
+- If the Sheet can't be read, the store keeps showing the last good catalog and tries again in a minute.
+- Cart and checkout accept 30 posts a minute per address; bodies over 10 KB (webhook: 1 MB) and bad lengths are refused.
+- Print files must be `https://` links, or the order waits in Excepciones.
+- Every page sends a strict Content-Security-Policy (no scripts at all), HSTS, nosniff and no framing.
 
 ## Putting products on sale
 

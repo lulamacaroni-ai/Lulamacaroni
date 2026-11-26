@@ -433,3 +433,125 @@ def test_admin_screen(book, store):
     html = render("/tienda", {}, Datos(book, store, NOW))
     assert "Tienda propia" in html and "LM-1001" in html and "Esperan tu aprobación" in html
     assert "1 pedido(s) por aprobar" in html and "buyer@example.com" not in html
+
+
+# --- hardening --------------------------------------------------------------------------------
+
+def test_rate_limit_per_address():
+    lim = srv.Limite(maximo=3, ventana=60)
+    assert all(lim.permite("1.1.1.1", ahora=t) for t in (0, 1, 2))
+    assert not lim.permite("1.1.1.1", ahora=3) and lim.permite("2.2.2.2", ahora=3)
+    assert lim.permite("1.1.1.1", ahora=61)  # the window moves on
+
+
+def test_too_many_cart_posts_get_429(servidor):
+    puerto, tienda = servidor
+    tienda.limite = srv.Limite(maximo=2)
+    origen = {"Origin": f"http://127.0.0.1:{puerto}", "Host": f"127.0.0.1:{puerto}",
+              "X-Forwarded-For": "9.9.9.9, 10.0.0.1"}
+    estados = [_pedir(puerto, "POST", "/cart/add", b"sku=LM-SPO-8X8-BL", origen)[0] for _ in range(3)]
+    assert estados == [303, 303, 429]
+
+
+def test_bad_content_length_is_refused(servidor):
+    puerto, _ = servidor
+    con = http.client.HTTPConnection("127.0.0.1", puerto, timeout=5)
+    con.putrequest("POST", "/stripe/webhook")
+    con.putheader("Content-Length", "-5")
+    con.endheaders()
+    assert con.getresponse().status == 400
+    origen = {"Origin": f"http://127.0.0.1:{puerto}", "Host": f"127.0.0.1:{puerto}"}
+    assert _pedir(puerto, "POST", "/cart/add", b"x" * 10_001, origen)[0] == 413
+
+
+def test_async_payment_success_records_the_order(servidor):
+    puerto, tienda = servidor
+    cuerpo = json.dumps({"type": "checkout.session.async_payment_succeeded",
+                         "data": {"object": {"id": "cs_test_1"}}}).encode()
+    assert _pedir(puerto, "POST", "/stripe/webhook", cuerpo,
+                  {"Stripe-Signature": firmar(cuerpo, "whsec_t")})[0] == 200
+    assert tienda.book.read("Pedidos")[0]["numero_canal"] == "LM-1001"
+
+
+def test_simultaneous_webhooks_make_one_order(servidor):
+    puerto, tienda = servidor
+    cuerpo = json.dumps({"type": "checkout.session.completed",
+                         "data": {"object": {"id": "cs_test_1"}}}).encode()
+    hilos = [threading.Thread(target=_pedir, args=(puerto, "POST", "/stripe/webhook", cuerpo,
+                                                   {"Stripe-Signature": firmar(cuerpo, "whsec_t")}))
+             for _ in range(6)]
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join()
+    assert len({r["numero_canal"] for r in tienda.book.read("Pedidos")}) == 1
+    assert len(tienda.store.all()) == 1 and len(tienda.mailer.enviados) == 1
+
+
+def test_failed_confirmation_email_is_an_exception_not_an_error(servidor):
+    puerto, tienda = servidor
+
+    class Roto(FakeMailer):
+        def enviar(self, **kw):
+            raise RuntimeError("Resend 500")
+
+    tienda.mailer = Roto()
+    cuerpo = json.dumps({"type": "checkout.session.completed",
+                         "data": {"object": {"id": "cs_test_1"}}}).encode()
+    assert _pedir(puerto, "POST", "/stripe/webhook", cuerpo,
+                  {"Stripe-Signature": firmar(cuerpo, "whsec_t")})[0] == 200
+    assert "Resend falló" in tienda.book.read("Excepciones")[0]["detalle"]
+
+
+def test_catalog_survives_a_sheet_outage(book):
+    reloj = [0.0]
+    cat = Catalogo(book, ttl=10, clock=lambda: reloj[0])
+    assert cat.productos()
+    original = book.read
+    book.read = lambda tab: (_ for _ in ()).throw(ConnectionError("Sheets down"))
+    reloj[0] = 20
+    assert cat.productos()  # last good copy, not an error page
+    book.read = original
+
+
+def test_print_file_must_be_https(tmp_path, store):
+    b = LocalWorkbook(tmp_path / "http")
+    llenar(b)
+    b.upsert("Variantes", [{**v, "archivo_impresion": "http://example.com/a.tif"}
+                           for v in b.read("Variantes")])
+    res = pedidos.registrar(session_pagada(), b, store, Catalogo(b), NOW)
+    assert any("https://" in p for p in res.problemas) and not res.aprobacion_id
+
+
+def test_head_on_store_host(book, store):
+    from lulamacaroni.app import server as app_server
+
+    class H(app_server.Handler):
+        pass
+
+    H.book, H.store, H.password = book, store, "pw"
+    H.tienda = srv.Tienda(book, store, AJ)
+    H.tienda_hosts = {"shop.test"}
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        con = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=5)
+        con.request("HEAD", "/", headers={"Host": "shop.test"})
+        r = con.getresponse()
+        assert r.status == 200 and r.read() == b""
+    finally:
+        httpd.shutdown()
+
+
+def test_one_refused_order_does_not_block_the_next(book, store):
+    s1, s2 = session_pagada(), session_pagada(sid="cs_test_2")
+    r1 = pedidos.registrar(s1, book, store, Catalogo(book), NOW)
+    r2 = pedidos.registrar(s2, book, store, Catalogo(book), NOW)
+    for r in (r1, r2):
+        decide(store, r.aprobacion_id, aprobar=True, decidido_por="Lorena")
+    prodigi = _prodigi(FakeResponse(400, {"outcome": "ValidationFailed"}),
+                       FakeResponse(200, {"order": {"id": "ord_2"}}))
+    enviados = envios.enviar_aprobados(book, store, FakeStripe({"cs_test_1": s1, "cs_test_2": s2}),
+                                       prodigi, NOW)
+    assert len(enviados) == 1
+    assert "Prodigi no aceptó" in book.read("Excepciones")[0]["detalle"]

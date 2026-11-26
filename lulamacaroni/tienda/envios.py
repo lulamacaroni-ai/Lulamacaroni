@@ -43,12 +43,16 @@ def enviar_aprobados(book, store, stripe, prodigi, ahora: datetime | None = None
         if rec.tipo != "pedido-tienda" or rec.estado != "aprobado" or rec.ejecutado_en:
             continue
         c = rec.contenido
-        envio = envio_de(stripe.checkout(c["stripe_checkout"]))
         try:
+            envio = envio_de(stripe.checkout(c["stripe_checkout"]))
             orden = prodigi.create_store_order(c, destinatario_prodigi(envio),
                                                huella_direccion(envio), approval=rec)
         except NotApproved as exc:
             _excepcion(book, c["pedido"], str(exc), ahora)
+            continue
+        except Exception as exc:  # noqa: BLE001 - Prodigi/Stripe refused one order: try the rest
+            log.exception("pedido %s no se pudo enviar", c["pedido"])
+            _excepcion(book, c["pedido"], f"Prodigi no aceptó el pedido: {exc}"[:300], ahora)
             continue
         mark_executed(store, rec, now=ahora)
         lineas = [r for r in book.read("Pedidos") if r.get("pedido_id") == c["stripe_checkout"]]

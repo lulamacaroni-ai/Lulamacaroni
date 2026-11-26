@@ -151,6 +151,8 @@ def registrar(session: dict, book, store, catalogo: Catalogo, ahora: datetime) -
             res.problemas.append(f"{sku}: falta el SKU de Prodigi en Variantes")
         if not op.archivo:
             res.problemas.append(f"{sku}: falta el archivo de impresión en Variantes")
+        elif not op.archivo.startswith("https://"):
+            res.problemas.append(f"{sku}: el archivo de impresión debe ser un enlace https://")
         items.append({"merchantReference": sku, "sku": op.pod_sku, "copies": cantidad,
                       "sizing": "fitPrintArea",  # never crop or stretch the art
                       "attributes": {"color": op.color_pod},

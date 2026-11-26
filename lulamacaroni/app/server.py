@@ -134,11 +134,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, "No encontrado", TEXT)
         self._send(200, html)
 
+    def do_HEAD(self):  # noqa: N802 - uptime checks and crawlers on the store
+        if self._es_tienda():
+            from ..tienda import server as tienda
+
+            return tienda.Handler.do_GET(self)
+        self._send(405, "Método no permitido", TEXT)
+
     def do_POST(self):  # noqa: N802
         if self._es_tienda():
             from ..tienda import server as tienda
 
-            return tienda.post(self)
+            return tienda.Handler.do_POST(self)
         if not self._authorized():
             return
         if urlparse(self.path).path != "/decidir":
