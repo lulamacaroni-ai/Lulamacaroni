@@ -27,6 +27,7 @@ lulamacaroni/
   app/                 The back office app: Inicio, Alertas, Aprobar, Catálogo, Contenido, Publicidad, Pedidos, Clientes, Investigación, Fuentes (Spanish)
   connectors/shopify.py  Shopify Admin GraphQL (client-credentials app): listings, orders, POD routing
   connectors/prodigi.py  Prodigi Print API v4 (orders, tracking, quotes, products)
+  tienda/              Our own store on lulamacaroni.com: catalog, cart, Stripe checkout, orders to Prodigi after approval, order emails (docs/tienda.md)
   checks/resolution.py   Print-file resolution/proportion check, never crops or stretches
   checks/guards.py       Discontinued-POD and sold-original guards
 docs/
@@ -51,6 +52,7 @@ pytest                        # everything runs offline
 python -m lulamacaroni.setup_workbook --dry-run         # what the workbook will look like
 python -m lulamacaroni.approval.server --demo           # approval page with sample requests
 python -m lulamacaroni.app.server --demo                # back office app with sample data
+python -m lulamacaroni.tienda.server --demo             # the store with a sample catalog, http://127.0.0.1:8780
 python -m lulamacaroni.connectors.shopify               # live read-only sync (to the sheet, or data/libro/ without a key)
 python -m lulamacaroni.app.server                       # back office app on that data, http://127.0.0.1:8770
 python -m lulamacaroni.app.alertas                      # today's summary + alerts as plain text (read-only)

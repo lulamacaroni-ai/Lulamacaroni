@@ -22,7 +22,8 @@ dev = [
 include = ["lulamacaroni*"]
 
 [tool.setuptools.package-data]
-"lulamacaroni.app" = ["static/*"]
+"lulamacaroni.app" = ["static/*", "static/arte/*"]
+"lulamacaroni.tienda" = ["politicas/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
