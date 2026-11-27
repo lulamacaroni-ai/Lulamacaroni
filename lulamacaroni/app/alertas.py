@@ -50,6 +50,18 @@ def _act(fuentes: dict[str, m.EstadoFuente], clave: str) -> datetime | None:
     return f.actualizado if f else None
 
 
+def pinterest_vence(nota: str):
+    """The token expiry the Pinterest sync wrote into its Fuentes note, or None."""
+    import re
+    from datetime import date
+
+    hit = re.search(r"(?:vence|venció) el (\d{4}-\d{2}-\d{2})", nota or "")
+    try:
+        return date.fromisoformat(hit.group(1)) if hit else None
+    except ValueError:
+        return None
+
+
 def _lista(items: list[str], n: int = 3) -> str:
     shown = ", ".join(f"“{t}”" for t in items[:n])
     return shown + (f" y {len(items) - n} más" if len(items) > n else "")
@@ -148,6 +160,19 @@ def calcular(pedidos_rows: list[dict], pedidos: list[m.Pedido], productos: list[
                 "los números que salen de aquí pueden no estar al día.",
                 f.info.nombre, f.actualizado, "/fuentes",
                 f"Vuelve a sincronizar {f.info.nombre}", 20))
+    pin = fuentes.get("pinterest")
+    vence = pinterest_vence(pin.nota if pin else "")
+    if pin and pin.estado != "sin-conectar" and vence is not None:
+        faltan = (vence - datetime.now(m.TZ).date()).days
+        if faltan <= 7:
+            out.append(Alerta(
+                ATENCION, "fuentes",
+                "Pinterest: el permiso " + ("ya venció" if faltan < 0
+                                            else f"vence en {faltan} día(s)"),
+                f"El permiso de lectura de Pinterest vence el {vence.isoformat()}. Sin uno nuevo, "
+                "los números de Pinterest dejan de actualizarse (se ven atrasados, no en cero).",
+                "Pinterest", pin.actualizado, "/fuentes",
+                "Pide a Jon un permiso nuevo de Pinterest", 25))
     pagos = fuentes.get("shopify-pagos")
     if shop.conectada and pagos and pagos.estado == "sin-conectar":
         out.append(Alerta(

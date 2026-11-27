@@ -18,7 +18,9 @@ def demo_rows(now: datetime | None = None) -> dict[str, list[dict]]:
             listados.append({
                 "listado_ref": f"shopify-{pi}{vi}", "sku": f"DEMO-{pi}-{size}" if pi != 3 else "",
                 "linea": "US-POD", "canal": "shopify", "id_en_canal": f"{pi}{vi}",
-                "titulo_en_canal": f"{title} / {size}", "url": "", "precio": 60 + 20 * vi,
+                "titulo_en_canal": f"{title} / {size}",
+                "url": "https://example.com/products/" + title.lower().replace(" ", "-"),
+                "precio": 60 + 20 * vi,
                 "inventario": "", "estado": "publicado" if pi != 2 else "pausado",
                 "ultima_sync": _iso(now), "id_producto_canal": str(pi),
                 "ruta_pod": ("prodigi-app", "frame-it-easy-app", "manual")[pi - 1],
@@ -227,6 +229,57 @@ def seed_investigacion(book, now: datetime | None = None) -> None:
          "estado": "probando", "desde": fechas[1].isoformat(), "nota": "ejemplo"}])
 
 
+def seed_pinterest(book, now: datetime | None = None) -> None:
+    """Demo Pinterest account: two boards, three pins, 30 days, through the real transforms.
+    Sample numbers only; the last two days are still "processing", as Pinterest reports them."""
+    from ..connectors import pinterest as pt
+
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    ts = now.isoformat()
+    hoy = now.date()
+    boards = [{"id": "b1", "name": "Sample Garden Prints", "privacy": "PUBLIC",
+               "pin_count": 2, "follower_count": 41},
+              {"id": "b2", "name": "Sample Harbor Paintings", "privacy": "PUBLIC",
+               "pin_count": 1, "follower_count": 12}]
+    tableros = [pt.board_to_row(x, ts) for x in boards]
+    nombres = {t["tablero_id"]: t["nombre"] for t in tableros}
+    productos = pt.productos_por_handle(book.read("Listados"))
+    periodo = f"{(hoy - timedelta(days=30)).isoformat()} a {(hoy - timedelta(days=1)).isoformat()}"
+
+    def stats(imp, sav, pc, oc):
+        return {"all": {"summary_metrics": {"IMPRESSION": imp, "SAVE": sav, "PIN_CLICK": pc,
+                                            "OUTBOUND_CLICK": oc},
+                        "daily_metrics": [{"date": "x", "data_status": "READY"}]}}
+
+    pins = [({"id": "900000000000000001", "title": "Sample Garden print", "board_id": "b1",
+              "link": "https://example.com/products/sample-garden", "media": {"media_type": "image"},
+              "created_at": (now - timedelta(days=20)).isoformat()}, stats(1840, 37, 52, 19)),
+            ({"id": "900000000000000002", "title": "Sample Garden detail", "board_id": "b1",
+              "link": "", "media": {"media_type": "image"},
+              "created_at": (now - timedelta(days=9)).isoformat()}, stats(610, 11, 14, 3)),
+            ({"id": "900000000000000003", "title": "Sample Harbor print", "board_id": "b2",
+              "link": "https://example.com/products/sample-harbor", "media": {"media_type": "image"},
+              "created_at": (now - timedelta(days=2)).isoformat()}, None)]
+    pines = [pt.pin_to_row(p, nombres, productos, a, periodo, ts) for p, a in pins]
+    dias = []
+    for i in range(30, 0, -1):
+        d = hoy - timedelta(days=i)
+        dias.append({"date": d.isoformat(), "data_status": "PROCESSING" if i <= 2 else "READY",
+                     "metrics": {"IMPRESSION": 60 + (30 - i) * 3, "SAVE": 1 + i % 3,
+                                 "PIN_CLICK": 2 + i % 4, "OUTBOUND_CLICK": i % 3,
+                                 "ENGAGEMENT": 4 + i % 5}})
+    book.upsert("Tableros", tableros)
+    book.upsert("Pines", pines)
+    book.upsert("PinterestDiario", pt.daily_rows({"all": {"daily_metrics": dias}}, ts))
+    vence = (hoy + timedelta(days=24)).isoformat()
+    book.upsert("Fuentes", [
+        {"fuente": "pinterest", "ultima_actualizacion": ts, "estado": "ok",
+         "filas": len(tableros) + len(pines) + len(dias),
+         "nota": f"@ejemplo; 53 seguidores; el permiso vence el {vence} (en 24 días)"},
+        {"fuente": "pinterest-ads", "ultima_actualizacion": ts, "estado": "sin-conectar",
+         "filas": 0, "nota": "la cuenta de Pinterest no tiene cuenta de anuncios"}])
+
+
 def fill_demo(book, now: datetime | None = None) -> None:
     from ..margen import recalcular
 
@@ -234,3 +287,4 @@ def fill_demo(book, now: datetime | None = None) -> None:
         book.upsert(tab_name, rows)
     recalcular(book)
     seed_investigacion(book, now)
+    seed_pinterest(book, now)
