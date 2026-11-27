@@ -11,6 +11,11 @@ It binds to 127.0.0.1 and is read-only, except for Aprobar/Rechazar, which recor
 Lorena's decision through the approval gate. Hosted (docs/hosting.md) it listens on
 ``--host 0.0.0.0`` and the host's ``PORT``, and then it refuses to start unless
 ``LULA_APP_PASSWORD`` is set: every page asks for that password first.
+
+One service, two faces: a request for one of the store's hosts (``LULA_TIENDA_HOSTS``, e.g.
+``lulamacaroni.com,www.lulamacaroni.com``) gets the public store (``lulamacaroni.tienda``),
+with no password; every other host (admin.lulamacaroni.com, the onrender.com address,
+127.0.0.1) gets this back office, the store's admin.
 """
 
 from __future__ import annotations
@@ -41,11 +46,21 @@ ESTATICOS = {"/perrito.js": (PERRITO_JS, "text/javascript; charset=utf-8")}
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
+def hosts_tienda() -> set[str]:
+    return {h.strip().lower() for h in (config.get("LULA_TIENDA_HOSTS") or "").split(",") if h.strip()}
+
+
 class Handler(BaseHTTPRequestHandler):
     book = None
     store = None
     banner = ""
     password = None  # set when hosted; every request must carry it (HTTP Basic auth)
+    tienda = None    # the public store, when LULA_TIENDA_HOSTS is set
+    tienda_hosts: set[str] = set()
+
+    def _es_tienda(self) -> bool:
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].lower()
+        return self.tienda is not None and host in self.tienda_hosts
 
     def log_message(self, fmt, *args):  # keep request logs free of query strings
         pass
@@ -87,6 +102,10 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def do_GET(self):  # noqa: N802
+        if self._es_tienda():
+            from ..tienda import server as tienda
+
+            return tienda.Handler.do_GET(self)
         if not self._authorized():
             return
         url = urlparse(self.path)
@@ -115,7 +134,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, "No encontrado", TEXT)
         self._send(200, html)
 
+    def do_HEAD(self):  # noqa: N802 - uptime checks and crawlers on the store
+        if self._es_tienda():
+            from ..tienda import server as tienda
+
+            return tienda.Handler.do_GET(self)
+        self._send(405, "Método no permitido", TEXT)
+
     def do_POST(self):  # noqa: N802
+        if self._es_tienda():
+            from ..tienda import server as tienda
+
+            return tienda.Handler.do_POST(self)
         if not self._authorized():
             return
         if urlparse(self.path).path != "/decidir":
@@ -173,6 +203,12 @@ def main(argv: list[str] | None = None) -> int:
         # one connection and one cache for both: an approval shows up on the next screen
         Handler.store = (SheetsStore(Handler.book) if isinstance(Handler.book, Workbook)
                          else open_store())
+        Handler.tienda_hosts = hosts_tienda()
+        if Handler.tienda_hosts:
+            from ..tienda.server import iniciar_trabajador, tienda_desde_entorno
+
+            Handler.tienda = tienda_desde_entorno(Handler.book, Handler.store)
+            iniciar_trabajador(Handler.tienda)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
     print(f"Back office en {url}  (Ctrl+C para salir)")

@@ -126,6 +126,31 @@ class ProdigiClient:
         body.setdefault("merchantReference", approval.aprobacion_id)
         return self._request("POST", "/orders", json=body)["order"]
 
+    def create_store_order(self, contenido: dict, recipient: dict, address_print: str, *,
+                           approval) -> dict:
+        """Send a paid order from our own store (``lulamacaroni.tienda``).
+
+        Lorena approved ``contenido``, which carries everything Prodigi receives except the
+        street address, kept as a fingerprint so it never sits in the workbook.
+        ``address_print`` is the fingerprint of ``recipient`` as read from Stripe just now:
+        if it differs from the approved one, nothing is sent.
+        """
+        from ..approval.gate import NotApproved, assert_approved
+
+        assert_approved(approval, tipo="pedido-tienda", contenido=contenido)
+        if address_print != contenido.get("direccion_huella"):
+            raise NotApproved(f"{approval.aprobacion_id}: la dirección de envío cambió "
+                              "después de aprobarse; hace falta una nueva aprobación.")
+        body = {
+            "merchantReference": contenido["pedido"],
+            "idempotencyKey": approval.aprobacion_id,
+            "shippingMethod": contenido.get("shippingMethod", "Standard"),
+            "recipient": recipient,
+            "items": contenido["items"],
+            "metadata": {"canal": "web", "aprobacion": approval.aprobacion_id},
+        }
+        return self._request("POST", "/orders", json=body)["order"]
+
 
 def product_is_available(client: ProdigiClient, sku: str) -> bool:
     """True if Prodigi still offers ``sku``. Used by the discontinued-product guard."""

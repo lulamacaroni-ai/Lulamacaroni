@@ -150,6 +150,10 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
     if path == "/semana":
         clave = "actual" if params.get("s") == "actual" else "pasada"
         return sem.render(sem.calcular(d, clave), d.now, banner)
+    if path == "/tienda":
+        from . import tienda_admin
+
+        return tienda_admin.render(d, banner)
     if path == "/fuentes":
         return views.fuentes_view(d.fuentes, d.now, banner)
     if path == "/aprobar":

@@ -26,7 +26,7 @@ SIN_CONEXION = "fuente no conectada"
 # Sources that have a slot on the summary before they are connected. Each plugs in by
 # stamping its row in Fuentes (and, for a sales channel, writing Pedidos rows with its
 # ``canal``): the slot then switches from "—" to the real number with no other change.
-CANALES_VENTA = (("shopify", "shopify"), ("etsy", "etsy"))   # (fuente, Pedidos.canal)
+CANALES_VENTA = (("shopify", "shopify"), ("tienda", "web"), ("etsy", "etsy"))   # (fuente, Pedidos.canal)
 FUENTE_CONTABLE = "quickbooks"
 
 

@@ -36,7 +36,7 @@ ESTADO_FUENTE = {"ok": "al día", "atrasada": "atrasada", "error": "con error",
 NAV_GRUPOS = (
     ("Hoy", (("/inicio", "Inicio", "casa"), ("/alertas", "Alertas", "campana"),
              ("/aprobar", "Aprobar", "check"))),
-    ("Tienda", (("/catalogo", "Catálogo", "cuadros"), ("/pedidos", "Pedidos", "caja"),
+    ("Tienda", (("/tienda", "Tienda web", "carrito"), ("/catalogo", "Catálogo", "cuadros"), ("/pedidos", "Pedidos", "caja"),
                 ("/clientes", "Clientes", "personas"))),
     ("Promoción", (("/contenido", "Contenido", "calendario"), ("/publicidad", "Anuncios", "megafono"),
                    ("/investigacion", "Investigación", "lupa"))),
@@ -48,6 +48,7 @@ NAV = tuple((h, t) for _, items in NAV_GRUPOS for h, t, _ in items)
 # Small stroke icons (24×24 viewBox), drawn in the current text color.
 ICONOS = {
     "casa": "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10",
+    "carrito": "M3 4h2l2.4 11h11.2L21 7H6.2M9 20a1 1 0 1 0 0-.01M18 20a1 1 0 1 0 0-.01",
     "campana": "M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4",
     "check": "M4 12l5 5L20 6",
     "cuadros": "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
