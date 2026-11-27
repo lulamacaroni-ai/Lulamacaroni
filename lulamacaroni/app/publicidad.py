@@ -40,7 +40,7 @@ from .contenido import Gate
 PLATAFORMA = {"meta": "Meta (Instagram y Facebook)", "pinterest": "Pinterest",
               "google": "Google", "etsy-ads": "Etsy Ads", "otro": "Otra"}
 # Which Fuentes row reports each platform's own results (None: no connector planned yet)
-FUENTE_PLATAFORMA = {"meta": "meta", "pinterest": "pinterest", "etsy-ads": "etsy",
+FUENTE_PLATAFORMA = {"meta": "meta", "pinterest": "pinterest-ads", "etsy-ads": "etsy",
                      "google": None, "otro": None}
 ESTADO = {"por-aprobar": "Esperan tu aprobación", "aprobada": "Aprobadas, sin lanzar",
           "activa": "Activas", "pausada": "Pausadas", "borrador": "Borradores",
@@ -433,7 +433,7 @@ def resumen(cs: list[Campana], pedidos_rows: list[dict], dias: list[dict],
             fuentes: dict[str, m.EstadoFuente], per: m.Periodo, now: datetime) -> list[m.Dato]:
     datos: list[m.Dato] = []
     # 1. real spend, only from the platforms themselves
-    ads = [f for f in (fuentes["meta"], fuentes["pinterest"]) if f.conectada]
+    ads = [f for f in (fuentes["meta"], fuentes["pinterest-ads"]) if f.conectada]
     def_gasto = "Gasto reportado por cada plataforma de anuncios en el periodo."
     if not ads:
         datos.append(m.faltante("Gasto publicitario", "Meta Ads + Pinterest Ads", per.texto,

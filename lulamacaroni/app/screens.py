@@ -26,6 +26,7 @@ class Datos:
 
     def __init__(self, book, store, now: datetime | None = None):
         self.now = now or datetime.now(timezone.utc)
+        self._book = book
         self.pedidos_rows = book.read("Pedidos")
         self.listados = book.read("Listados")
         self.campanas = book.read("Campanas")
@@ -61,6 +62,20 @@ class Datos:
         self.campanas_plan = pub.campanas(self.publicidad, self.obras, self.approvals,
                                           self.topes, self.pedidos_rows, self.campanas,
                                           self.fuentes, self.now)
+
+    def pinterest(self) -> "cont.VistaPinterest":
+        """Pinterest's tabs, read only when Contenido shows them (a missing tab is no data)."""
+        from ..workbook import GoogleSetupError
+
+        filas, faltan = {}, []
+        for nombre in cont.TABS_PINTEREST:
+            try:
+                filas[nombre] = self._book.read(nombre)
+            except GoogleSetupError:
+                filas[nombre] = []
+                faltan.append(nombre)
+        return cont.pinterest(filas["PinterestDiario"], filas["Pines"], filas["Tableros"],
+                              self.fuentes, self.now, faltan)
 
     def _opcional(self, book, nombre: str) -> list[dict]:
         from ..workbook import GoogleSetupError
@@ -113,7 +128,9 @@ def render(path: str, params: dict[str, str], d: Datos, banner: str = "") -> str
         plat = params.get("pl", "")
         plat = plat if plat in cont.PLATAFORMA else ""
         ps = [p for p in d.piezas if not plat or p.plataforma == plat]
-        return views.contenido_view(ps, cont.resumen(ps, d.fuentes, d.now), plat, d.now, banner)
+        pin = d.pinterest() if plat in ("", "pinterest") else None
+        return views.contenido_view(ps, cont.resumen(ps, d.fuentes, d.now), plat, d.now, banner,
+                                    pin)
     if path == "/publicidad":
         clave = params.get("p", "30")
         per = m.periodo(clave if clave in m.PERIODOS else "30", d.now)

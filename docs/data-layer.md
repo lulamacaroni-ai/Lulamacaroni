@@ -426,6 +426,64 @@ One row per: Una keyword que Lorena quiere probar en una obra, y cómo le fue. K
 | `nota` |  |
 | `actualizado` |  |
 
+### Tableros
+
+One row per: Un tablero de Pinterest de la cuenta del negocio. Key: `tablero_id`.
+
+| Column | Allowed values |
+|---|---|
+| `tablero_id` |  |
+| `nombre` |  |
+| `descripcion` |  |
+| `privacidad` | publico, protegido, secreto |
+| `pines` |  |
+| `seguidores` |  |
+| `creado` |  |
+| `ultima_sync` |  |
+
+### Pines
+
+One row per: Un pin de la cuenta, con sus números de los últimos 30 días según Pinterest. Key: `pin_id`.
+
+| Column | Allowed values |
+|---|---|
+| `pin_id` |  |
+| `linea` | US-POD, MX-original |
+| `tablero_id` |  |
+| `tablero` |  |
+| `titulo` |  |
+| `descripcion` |  |
+| `enlace` |  |
+| `id_producto_canal` |  |
+| `producto` |  |
+| `imagen_url` |  |
+| `tipo_medio` |  |
+| `creado` |  |
+| `periodo` |  |
+| `impresiones` |  |
+| `guardados` |  |
+| `clics_pin` |  |
+| `clics_enlace` |  |
+| `calidad_dato` | real, estimado, faltante |
+| `ultima_sync` |  |
+
+### PinterestDiario
+
+One row per: Un día de la cuenta de Pinterest: impresiones, guardados y clics de todos los pines. Key: `fecha`.
+
+| Column | Allowed values |
+|---|---|
+| `fecha` |  |
+| `linea` | US-POD, MX-original |
+| `impresiones` |  |
+| `guardados` |  |
+| `clics_pin` |  |
+| `clics_enlace` |  |
+| `interacciones` |  |
+| `estado_pinterest` |  |
+| `calidad_dato` | real, estimado, faltante |
+| `ultima_sync` |  |
+
 ### Fuentes
 
 One row per: Una fuente de datos y su última actualización. Key: `fuente`.

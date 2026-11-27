@@ -17,7 +17,8 @@ Back office, shared by both lines:
 1. **Workbook** (Google Sheets, `LulaMacaroni Operaciones`) is the system of record. See [data-layer.md](data-layer.md).
 2. **Connectors** are Python jobs on a schedule that read each platform into the workbook and stamp `Fuentes` with the last update.
    - Real API: Prodigi, Shopify, Etsy, Google Drive, QuickBooks.
-   - Later, after app review: Meta, Pinterest.
+   - Pinterest (read-only, trial access): boards, pins, analytics, ad spend.
+   - Later, after app review: Meta.
    - Monthly CSV import: eRank, EverBee.
    - One-time manual setup: GoDaddy, Canva.
 3. **Checks** run against the catalog: print resolution and proportion, the discontinued-POD guard, the sold-original guard, and order exceptions.

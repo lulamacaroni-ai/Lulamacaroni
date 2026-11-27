@@ -27,6 +27,13 @@ Set now:
 | `PRODIGI_SANDBOX_API_KEY` | Sandbox key (separate sandbox account) | same |
 | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | Base64 of the whole service-account JSON file, on one line | [google-cloud.md](setup/google-cloud.md) |
 
+Pinterest (read-only; steps in [pinterest.md](setup/pinterest.md)). Renew about monthly; Alertas warns a week before:
+
+| Variable | What it is |
+|---|---|
+| `PINTEREST_ACCESS_TOKEN` | OAuth token for `@lulamacaroni`, scopes `user_accounts:read,boards:read,pins:read,ads:read` |
+| `PINTEREST_TOKEN_VENCE` | Its expiry date (`YYYY-MM-DD`), copied with it by the PowerShell block |
+
 Optional, with safe defaults:
 
 | Variable | Default | Notes |
@@ -39,7 +46,7 @@ Optional, with safe defaults:
 | `SHOPIFY_API_VERSION` | `2025-10` | |
 | `LULA_INVESTIGACION_CARPETA_ID` | empty | Pin the research Drive folder; otherwise it is found by the name "LulaMacaroni Investigación" |
 
-Not set yet (sources not connected): Etsy (`ETSY_*`), QuickBooks (`QBO_*`), Meta (`META_*`, `INSTAGRAM_BUSINESS_ID`), Pinterest (`PINTEREST_ACCESS_TOKEN`), `ANTHROPIC_API_KEY` for scheduled agents, `LULA_DRIVE_FOLDER_ID`.
+Not set yet (sources not connected): Etsy (`ETSY_*`), QuickBooks (`QBO_*`), Meta (`META_*`, `INSTAGRAM_BUSINESS_ID`), `ANTHROPIC_API_KEY` for scheduled agents, `LULA_DRIVE_FOLDER_ID`.
 
 ## 3. Allowed domains
 
@@ -49,7 +56,9 @@ Network access → Allowed domains on the same environment:
 - `api.prodigi.com`, `api.sandbox.prodigi.com`
 - `sheets.googleapis.com`, `www.googleapis.com`, `oauth2.googleapis.com`
 
-When Etsy, QuickBooks, Meta or Pinterest get connected, add their API hosts here too.
+- `api.pinterest.com` (Pinterest sync)
+
+When Etsy, QuickBooks or Meta get connected, add their API hosts here too.
 
 ## 4. Google service account and the sheet
 
@@ -71,6 +80,8 @@ python -m lulamacaroni.sync                              # THE daily command (PR
 python -m lulamacaroni.connectors.shopify --dry-run      # counts, writes nothing
 python -m lulamacaroni.connectors.shopify                # Shopify alone: Listados, Pedidos, Clientes, fees, payouts
 python -m lulamacaroni.connectors.prodigi --sync         # Prodigi alone: real costs into Pedidos (read-only on Prodigi)
+python -m lulamacaroni.connectors.pinterest --check      # Pinterest: account and token expiry, writes nothing
+python -m lulamacaroni.connectors.pinterest              # Pinterest alone: boards, pins, analytics, ad spend (read-only)
 python -m lulamacaroni.connectors.investigacion          # monthly: new eRank/EverBee CSVs from the Drive folder (PR #10)
 python -m lulamacaroni.app.alertas                       # Resumen del día + alerts as text
 python -m lulamacaroni.app.semanal                       # weekly summary, last full week (--actual: this week so far) (PR #14)

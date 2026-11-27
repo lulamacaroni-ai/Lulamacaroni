@@ -2,8 +2,9 @@
 
 Lorena's requirements, section 3 and 11: keep a queue of ideas, drafts, approved,
 scheduled and published pieces; nothing is published without her approval; keep the link
-and result of each post. Rows live in the ``Contenido`` tab. Instagram and Pinterest are
-not connected yet, so this is read-only and results show "—" until they are.
+and result of each post. Rows live in the ``Contenido`` tab. Pinterest results come from the
+read-only Pinterest sync (``Pines``, ``Tableros``, ``PinterestDiario``); Instagram is not
+connected yet, so its results show "—".
 
 The approval gate covers exactly :func:`contenido_aprobable`: platform, format, language,
 text, image file and date. Any edit after approval changes the fingerprint and the piece
@@ -124,7 +125,7 @@ def calendario(ps: list[Pieza], now: datetime, dias: int = 14) -> list[tuple[dat
 def resumen(ps: list[Pieza], fuentes: dict[str, m.EstadoFuente], now: datetime) -> list[m.Dato]:
     semana = now + timedelta(days=7)
     mes = now - timedelta(days=30)
-    nota = "Registrado en la hoja; Instagram y Pinterest aún no conectados para verificarlo."
+    nota = "Registrado en la hoja (lo que se marcó a mano)."
     datos = [
         m.Dato("Programadas 7 días", sum(1 for p in ps if p.estado in ("aprobado", "programado")
                                          and p.fecha and now <= p.fecha < semana),
@@ -140,13 +141,12 @@ def resumen(ps: list[Pieza], fuentes: dict[str, m.EstadoFuente], now: datetime) 
                "Piezas marcadas como publicadas con fecha en los últimos 30 días.", now, "n",
                nota=nota),
     ]
-    conectadas = [f for f in (fuentes.get("instagram"), fuentes.get("pinterest"))
-                  if f and f.conectada]
-    if not conectadas:
+    ig = fuentes.get("instagram")
+    if not (ig and ig.conectada):
         datos.append(m.faltante(
-            "Resultados", "Instagram + Pinterest", "últimos 30 días",
-            "Alcance, guardados, compartidos y clics de lo publicado, según cada plataforma.",
-            "Instagram y Pinterest aún no están conectados.", "n", "/fuentes"))
+            "Resultados de Instagram", "Instagram", "últimos 30 días",
+            "Alcance, guardados, compartidos y clics de lo publicado, según Instagram.",
+            "Instagram aún no está conectado.", "n", "/fuentes"))
     return datos
 
 
@@ -155,3 +155,70 @@ def alertas(ps: list[Pieza], now: datetime) -> list[Pieza]:
     limite = now + timedelta(days=3)
     return [p for p in ps if p.gate.alerta
             and (p.estado == "publicado" or p.fecha is None or p.fecha <= limite)]
+
+
+# --- Pinterest results (read-only, from the Pinterest sync) ---------------------------------
+
+FUENTE_PIN = "Pinterest (analítica de la cuenta)"
+TABS_PINTEREST = ("PinterestDiario", "Pines", "Tableros")
+
+
+@dataclass
+class VistaPinterest:
+    conectada: bool
+    nota: str                  # why not, or the source note (account, token expiry)
+    datos: list[m.Dato]
+    pines: list[dict]          # most seen first
+    tableros: list[dict]
+    faltan_tabs: list[str]
+
+
+def _suma(rows: list[dict], col: str) -> float | None:
+    vals = [m.num(r.get(col)) for r in rows]
+    return None if any(v is None for v in vals) else sum(vals)
+
+
+def pinterest(diario: list[dict], pines: list[dict], tableros: list[dict],
+              fuentes: dict[str, m.EstadoFuente], now: datetime,
+              faltan_tabs: list[str] | None = None) -> VistaPinterest:
+    """Account totals for the last 30 days of data, the pins ranked by impressions, boards.
+
+    A day Pinterest is still processing makes the total ``estimado``; a day it can't report
+    (or no rows at all) makes it ``faltante``. Never a zero for something unknown.
+    """
+    f = fuentes.get("pinterest")
+    defs = (("Impresiones", "impresiones", "Veces que se vieron tus pines en Pinterest."),
+            ("Guardados", "guardados", "Veces que alguien guardó uno de tus pines."),
+            ("Clics al enlace", "clics_enlace",
+             "Clics que salieron de Pinterest hacia el enlace del pin (la tienda)."),
+            ("Clics en el pin", "clics_pin", "Clics para ver el pin en grande."))
+    periodo = "últimos 30 días con datos (Pinterest reporta con 1–2 días de retraso)"
+    if not f or not f.conectada:
+        porque = ("Fuente no conectada" + (f" ({f.nota or f.info.fase})." if f else "."))
+        if f and f.estado == "error":
+            porque = f"La última sincronización falló ({f.nota})."
+        return VistaPinterest(False, porque, [m.faltante(e, "Pinterest", periodo, d, porque, "n",
+                                                         "/fuentes") for e, _, d in defs],
+                              [], [], faltan_tabs or [])
+    limite = (now - timedelta(days=31)).date().isoformat()
+    filas = sorted((r for r in diario if (r.get("fecha") or "") >= limite),
+                   key=lambda r: r.get("fecha") or "")
+    calidades = {r.get("calidad_dato") for r in filas}
+    datos = []
+    for etiqueta, col, definicion in defs:
+        total = _suma(filas, col)
+        if not filas or total is None or "faltante" in calidades:
+            datos.append(m.faltante(
+                etiqueta, FUENTE_PIN, periodo, definicion,
+                "Pinterest aún no reporta estos días." if not filas
+                else "Pinterest no reporta algún día del periodo.", "n", "/fuentes"))
+            continue
+        calidad = "estimado" if "estimado" in calidades else "real"
+        datos.append(m.Dato(
+            etiqueta, total, calidad, FUENTE_PIN,
+            f"{filas[0]['fecha']} a {filas[-1]['fecha']}", definicion, f.actualizado, "n",
+            nota="Pinterest aún procesa algún día: puede subir." if calidad == "estimado" else ""))
+    vistos = sorted(pines, key=lambda p: (m.num(p.get("impresiones")) is None,
+                                          -(m.num(p.get("impresiones")) or 0)))
+    tabs = sorted(tableros, key=lambda t: -(m.num(t.get("pines")) or 0))
+    return VistaPinterest(True, f.nota, datos, vistos, tabs, faltan_tabs or [])
