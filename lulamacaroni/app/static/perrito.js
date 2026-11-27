@@ -1,7 +1,8 @@
 /* The puppy (Lore's art). Loaded only on the visits when it plays; see PERRITO_JS in views.py.
  *
- * A dog pillow sits next to "Hola, Lore". The puppy walks out from behind the left menu to the
- * pillow, turns around on it twice the way dogs do before settling, then lies down facing
+ * A dog pillow sits next to "Hola, Lore". The puppy pops its head in from the right edge of the
+ * screen, tilts its head at Lore, ducks back out, then walks in across the page to the pillow,
+ * sniffs it, turns around on it twice the way dogs do before settling, then lies down facing
  * forward and stays there, breathing slowly.
  *
  * The head is Lore's original cut-out, shown unchanged (scaled evenly, never mirrored, cropped,
@@ -31,9 +32,8 @@
   if (!h1) return;
   var rango = D.createRange(); rango.selectNodeContents(h1);
   var texto = rango.getBoundingClientRect(), sx = W.scrollX, sy = W.scrollY;
-  var side = D.querySelector(".side"), r = side ? side.getBoundingClientRect() : null;
-  var x0 = r && r.right > 0 ? r.right + sx : sx;     // behind the menu, or the screen edge on phones
   var ancho = D.documentElement.clientWidth;
+  var borde = sx + ancho;                             // the right edge of the screen: it comes in there
 
   var wpx = Math.round(clamp(ancho * 0.09, 96, 128)); // dog drawing width (walking, side view)
   var VB_W = 200, VB_H = 140, SUELO = 132, u = wpx / VB_W, hpx = wpx * VB_H / VB_W;
@@ -79,7 +79,12 @@
 
   var caja = D.createElement("div");
   caja.className = "perrito"; caja.setAttribute("aria-hidden", "true");
-  caja.style.cssText = "position:absolute;width:" + wpx + "px;z-index:19;transform-origin:50% 100%";
+  caja.style.cssText = "position:absolute;width:" + wpx + "px;transform-origin:50% 100%";
+  // a strip as wide as the screen that hides whatever is past its edge, so the dog can peek in
+  // from off-screen without making the page scroll sideways
+  var escena = D.createElement("div");
+  escena.className = "perrito"; escena.setAttribute("aria-hidden", "true");
+  escena.appendChild(caja);
   var svg = el("svg", { viewBox: "0 0 " + VB_W + " " + VB_H, width: wpx, height: hpx });
   svg.style.display = "block"; svg.style.overflow = "visible";
   caja.appendChild(svg);
@@ -245,14 +250,19 @@
   // ---- motion --------------------------------------------------------------------------------
   var arriba = piso - SUELO * u;                      // div top so the paws stand on the pillow line
   var meta = almCx - CENTRO * u;                      // body centred over the pillow
-  // A small dog walks at about 1.9 strides a second; its speed is set so planted paws never slide.
-  var HZ = 1.9, VEL = clamp(ancho * 0.065, 64, 86);
-  var x = x0 - wpx, v = 0, fase = 0, t = 0, antes = null;
-  var aplasto = false, estado = "camina", tEstado = 0, R = almW * 0.13;
+  // A small dog walks briskly at about 2 strides a second; its speed is set so planted paws never slide.
+  var HZ = 2.2, VEL = clamp(ancho * 0.075, 66, 92);
+  var DIR = -1;                                       // it comes from the right, so it faces left
+  var ESC_ALTO = Math.round(hpx + 80), ESC_TOP = Math.round(arriba - 50);
+  escena.style.cssText = "position:absolute;left:" + sx + "px;top:" + ESC_TOP + "px;width:" + ancho +
+    "px;height:" + ESC_ALTO + "px;overflow:hidden;z-index:19";
+  var FUERA = borde + 2, ASOMADO = borde - 95 * u;     // hidden just past the edge / head and shoulders in
+  var x = FUERA, v = 0, fase = 0, t = 0, antes = null;
+  var aplasto = false, estado = "asoma", tEstado = 0, R = almW * 0.13;
   var T_OLFATEA = 1.1, VUELTAS = 2, T_VUELTAS = 3.4, T_ECHARSE = 1.9;
 
   function coloca(px, py, escala, inclina) {
-    caja.style.left = px + "px"; caja.style.top = py + "px";
+    caja.style.left = (px - sx) + "px"; caja.style.top = (py - ESC_TOP) + "px";
     caja.style.transform = (escala === 1 ? "" : "scale(" + escala + ") ") + (inclina ? "rotate(" + inclina + "deg)" : "");
   }
   function cambia(s) { estado = s; tEstado = t; }
@@ -261,40 +271,51 @@
     if (antes == null) antes = ahora;
     var dt = Math.min(0.05, (ahora - antes) / 1000); antes = ahora; t += dt;
     var k, hz;
-    if (estado === "camina") {
-      var resta = meta - x;
-      v = Math.min(VEL * Math.min(1, 0.25 + t / 0.6), VEL * clamp(resta / 50, 0.2, 1));   // ease in and out
-      x = Math.min(meta, x + v * dt);
+    if (estado === "asoma") {
+      // pops its head in, tilts it one way and the other (the curious dog look), ducks back out
+      var a = t - tEstado, c;
+      if (a < 0.35) x = lerp(FUERA, ASOMADO, suave(a / 0.35));
+      else if (a < 1.6) x = ASOMADO;
+      else x = lerp(ASOMADO, FUERA, suave((a - 1.6) / 0.3));
+      c = postura(fase, 0, 0, 0, DIR, 1, 0);
+      if (a > 0.45 && a < 1.55) c.r += 11 * Math.sin(2 * Math.PI * (a - 0.45) / 1.1);
+      cabezaEn(c);
+      coloca(x, arriba, 1);
+      if (a > 2.5) { x = FUERA; cambia("camina"); }
+    } else if (estado === "camina") {
+      var resta = x - meta;
+      v = Math.min(VEL * Math.min(1, 0.25 + (t - tEstado) / 0.6), VEL * clamp(resta / 50, 0.2, 1));   // ease in and out
+      x = Math.max(meta, x - v * dt);
       hz = HZ * (0.45 + 0.55 * v / VEL);              // slower steps when it slows down
       fase = frac(fase + hz * dt);
       var parar = clamp(1 - resta / 25, 0, 1);         // squares up its legs as it arrives
-      cabezaEn(postura(fase, clamp((v / u) * PASO.apoyo / hz, 0, 44), 0, 0, 1, suave(parar), 0));
+      cabezaEn(postura(fase, clamp((v / u) * PASO.apoyo / hz, 0, 44), 0, 0, DIR, suave(parar), 0));
       coloca(x, arriba, 1);
       if (resta < 0.5) cambia("olfatea");
     } else if (estado === "olfatea") {
       // stops, puts its nose down to the bed, then looks up
       k = clamp((t - tEstado) / T_OLFATEA, 0, 1);
-      cabezaEn(postura(fase, 0, 0, 0, 1, 1, Math.sin(Math.PI * k)));
+      cabezaEn(postura(fase, 0, 0, 0, DIR, 1, Math.sin(Math.PI * k)));
       if (k >= 1) cambia("vueltas");
     } else if (estado === "vueltas") {
       // turning round on the bed, nose low: a tight loop seen from the side; the body faces the way
       // it walks (side-on at the front and back of the loop, end-on at the sides)
       k = clamp((t - tEstado) / T_VUELTAS, 0, 1);
       var theta = 2 * Math.PI * VUELTAS * suave(k);
-      var cz = Math.cos(theta), giro = (cz < 0 ? -1 : 1) * Math.max(0.28, Math.abs(cz));
+      var cz = Math.cos(theta), giro = DIR * (cz < 0 ? -1 : 1) * Math.max(0.28, Math.abs(cz));
       var arranque = suave(k * 6) * suave((1 - k) * 6);   // steps start and stop with the loop
       fase = frac(fase + HZ * 0.9 * dt * arranque);
       cabezaEn(postura(fase, 18 * arranque, 0, 0, giro, 1 - arranque, 0.35 * arranque));
       // nearer the viewer at the front of the loop: lower and bigger; farther at the back;
       // leaning into the turn while it moves across
-      coloca(meta + R * Math.sin(theta), arriba - 5 * (1 - cz), 0.9 + 0.1 * cz,
-        -3.5 * Math.sin(theta) * Math.sin(Math.PI * k));
+      coloca(meta + DIR * R * Math.sin(theta), arriba - 5 * (1 - cz), 0.9 + 0.1 * cz,
+        -3.5 * DIR * Math.sin(theta) * Math.sin(Math.PI * k));
       if (k >= 1) cambia("echarse");
     } else {
       // sits first (hind end down), then walks the front paws out and lowers the chest, turning to
       // face forward; the bed gives as the weight lands
       var s = t - tEstado;
-      var eT = suave(s / 0.75), eD = suave((s - 0.6) / 1.0), giro2 = lerp(1, 0.04, suave((s - 0.7) / 1.0));
+      var eT = suave(s / 0.75), eD = suave((s - 0.6) / 1.0), giro2 = lerp(DIR, -0.04, suave((s - 0.7) / 1.0));
       cabezaEn(postura(fase, 0, eT, eD, giro2, 1, 0));
       manos.setAttribute("opacity", suave((eD - 0.5) * 2));
       manos.setAttribute("transform", "translate(0 " + (SUELO - 9 + 4 * (1 - eD)) + ")");
@@ -325,11 +346,11 @@
   var pre = new Image();
   pre.onload = function () {
     D.body.appendChild(fondo.div);
-    D.body.appendChild(caja);
+    D.body.appendChild(escena);
     D.body.appendChild(frente.div);
     fondo.div.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: "both" });
     frente.div.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: "both" });
-    cabezaEn(postura(0, 0, 0, 0, 1, 0, 0));
+    cabezaEn(postura(0, 0, 0, 0, DIR, 1, 0));
     coloca(x, arriba, 1);
     setTimeout(function () { W.requestAnimationFrame(cuadro); }, 700);
   };
